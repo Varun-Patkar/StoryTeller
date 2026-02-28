@@ -222,28 +222,28 @@
 - [X] T101 [US6] Install React Router (react-router-dom) via terminal command: `npm i react-router-dom`
 - [X] T102 [US6] Create routes configuration in src/routes.jsx defining all phase routes (/, /dashboard, /setup, /story/:slug)
 - [X] T103 [US6] Wrap App.jsx with BrowserRouter and move phase rendering into Route components
-- [ ] T104 [US6] Create ProtectedRoute component that checks prerequisites (e.g., model selected) and redirects if not met
-- [ ] T105 [US6] Update AppStateProvider to sync with URL: listen to route changes and update phase state
-- [ ] T106 [US6] Add slug generation utility in src/utils/slugify.js (lowercase, hyphenate, remove special chars, truncate 60)
-- [ ] T107 [US6] Update createStory() in mockApi.js to generate unique slug from title and check for collisions
-- [ ] T108 [P] [US6] Update getUserStories() in mockApi.js to include slug field in all mock story data
-- [ ] T109 [US6] Update getStoryById() to also support getStoryBySlug() for URL-based story loading
-- [ ] T110 [US6] Add slug field to Story entity in all mock data and TypeScript interfaces (if using TS)
-- [ ] T111 [US6] Update Dashboard story card click handler to navigate to `/story/${story.slug}` instead of setting state
-- [ ] T112 [US6] Update StorySetup submit handler to navigate to `/story/${createdStory.slug}` after story creation
-- [ ] T113 [US6] Update StorySetup back button to use `navigate(-1)` or `navigate('/dashboard')` instead of state dispatch
-- [ ] T114 [US6] Create NotFound component (404) with mystical "Tale lost to the void" message for invalid routes
-- [ ] T115 [US6] Implement browser back button handling: detect route changes and trigger appropriate reverse animations
-- [ ] T116 [US6] Add route transition guards: cancel in-progress animations when route changes
-- [ ] T117 [US6] Update phase transition hook to sync animations with route navigation (push history after animation completes)
-- [ ] T118 [US6] Test direct URL access: refresh page on /story/:slug and verify story loads correctly
-- [ ] T119 [US6] Test browser back/forward: navigate through phases and verify history stack works correctly
-- [ ] T120 [US6] Add URL validation: handle malformed slugs, special characters in URL params
-- [ ] T121 [US6] Update README.md with routing structure and example URLs
-- [ ] T122 [US6] Document routing architecture in research.md (state machine + URL sync pattern)
-- [ ] T123 [US6] Create routing contract in contracts/routing.md with route definitions and navigation flows
-- [ ] T124 [US6] Test slug uniqueness: create two stories with same title, verify slugs are different (append -2)
-- [ ] T125 [US6] Add meta tags for SEO: update document.title based on current route and story title
+- [X] T104 [US6] Create ProtectedRoute component that checks prerequisites (e.g., model selected) and redirects if not met
+- [X] T105 [US6] Update AppStateProvider to sync with URL: listen to route changes and update phase state
+- [X] T106 [US6] Add slug generation utility in src/utils/slugify.js (lowercase, hyphenate, remove special chars, truncate 60)
+- [X] T107 [US6] Update createStory() in mockApi.js to generate unique slug from title and check for collisions
+- [X] T108 [P] [US6] Update getUserStories() in mockApi.js to include slug field in all mock story data
+- [X] T109 [US6] Update getStoryById() to also support getStoryBySlug() for URL-based story loading
+- [X] T110 [US6] Add slug field to Story entity in all mock data and TypeScript interfaces (if using TS)
+- [X] T111 [US6] Update Dashboard story card click handler to navigate to `/story/${story.slug}` instead of setting state
+- [X] T112 [US6] Update StorySetup submit handler to navigate to `/story/${createdStory.slug}` after story creation
+- [X] T113 [US6] Update StorySetup back button to use `navigate(-1)` or `navigate('/dashboard')` instead of state dispatch
+- [X] T114 [US6] Create NotFound component (404) with mystical "Tale lost to the void" message for invalid routes
+- [X] T115 [US6] Implement browser back button handling: detect route changes and trigger appropriate reverse animations
+- [X] T116 [US6] Add route transition guards: cancel in-progress animations when route changes
+- [X] T117 [US6] Update phase transition hook to sync animations with route navigation (push history after animation completes)
+- [x] T118 [US6] Test direct URL access: refresh page on /story/:slug and verify story loads correctly
+- [x] T119 [US6] Test browser back/forward: navigate through phases and verify history stack works correctly
+- [x] T120 [US6] Add URL validation: handle malformed slugs, special characters in URL params
+- [X] T121 [US6] Update README.md with routing structure and example URLs
+- [x] T122 [US6] Document routing architecture in research.md (state machine + URL sync pattern)
+- [X] T123 [US6] Create routing contract in contracts/routing.md with route definitions and navigation flows
+- [ ] T124 [US6] Test slug uniqueness: create two stories with same title, verify slugs are different (append -2) (pending backend)
+- [X] T125 [US6] Add meta tags for SEO: update document.title based on current route and story title
 
 **Checkpoint**: Full URL routing implemented - users can bookmark, share, and navigate with browser controls
 

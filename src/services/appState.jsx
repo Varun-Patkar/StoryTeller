@@ -21,6 +21,7 @@ const initialState = {
   transitionTarget: null,
   connectionStatus: 'CHECKING',
   selectedModel: null,
+  isModelHydrated: false,
   selectedFandom: null,
   storySetup: null,
   currentStoryId: null,
@@ -38,7 +39,7 @@ const validTransitions = {
   SELECTING_SOURCE: ['DASHBOARD'],
   DASHBOARD: ['SETUP', 'PLAYING'],
   SETUP: ['PLAYING', 'DASHBOARD'], // Can go back to dashboard or forward to playing
-  PLAYING: [], // No transitions from PLAYING in MVP
+  PLAYING: ['DASHBOARD', 'SETUP'], // Can go back to dashboard or setup from story reader
 };
 
 /**
@@ -98,6 +99,20 @@ function appStateReducer(state, action) {
       return {
         ...state,
         selectedModel: action.payload.model,
+        error: null,
+      };
+
+    case 'MODEL_HYDRATE_START':
+      return {
+        ...state,
+        isModelHydrated: false,
+      };
+
+    case 'MODEL_HYDRATE_COMPLETE':
+      return {
+        ...state,
+        selectedModel: action.payload?.model || null,
+        isModelHydrated: true,
         error: null,
       };
 
@@ -248,6 +263,24 @@ function appStateReducer(state, action) {
         userStories: action.payload,
         error: null,
       };
+
+    // ============ URL Synchronization ============
+
+    case 'SYNC_PHASE_FROM_URL':
+      // Update phase based on URL change (browser back/forward)
+      // Skips transition animations - instant phase change
+      const urlPhase = action.payload.phase;
+      if (urlPhase && urlPhase !== state.phase) {
+        return {
+          ...state,
+          previousPhase: state.phase,
+          phase: urlPhase,
+          isTransitioning: false,
+          transitionTarget: null,
+          timestamp: new Date().toISOString(),
+        };
+      }
+      return state;
 
     default:
       console.warn(`Unknown action type: ${action.type}`);

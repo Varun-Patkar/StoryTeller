@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppState } from '@/services/appState.jsx';
 import { getStoryById, getUserStories, getAvailableModels } from '@/services/mockApi';
 import Button from '@/components/common/Button';
@@ -16,6 +17,7 @@ import Dropdown from '@/components/common/Dropdown';
  */
 export default function Dashboard() {
   const { state, dispatch } = useAppState();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [resumeLoadingId, setResumeLoadingId] = useState('');
@@ -99,7 +101,7 @@ export default function Dashboard() {
   }
 
   /**
-   * Sends the user to story setup phase.
+   * Sends the user to story setup phase via /setup route.
    *
    * @returns {void}
    */
@@ -107,7 +109,9 @@ export default function Dashboard() {
     if (state.isTransitioning) {
       return;
     }
+    // Navigate to setup page with animation trigger
     dispatch({ type: 'TRANSITION_TO_SETUP' });
+    navigate('/new');
   };
 
   /**
@@ -127,22 +131,27 @@ export default function Dashboard() {
   };
 
   /**
-   * Loads a story and transitions to the reading phase.
+   * Loads a story and navigates to the reading interface via /story/:slug route.
    *
-   * @param {string} storyId - Story identifier
-   * @returns {Promise<void>} Resolves after transition dispatch
+   * @param {Object} story - Story object with id and slug
+   * @returns {Promise<void>} Resolves after navigation
    */
-  const handleResumeStory = async storyId => {
-    if (state.isTransitioning || !storyId) {
+  const handleResumeStory = async story => {
+    if (state.isTransitioning || !story || ! story.id) {
       return;
     }
 
     try {
-      setResumeLoadingId(storyId);
+      setResumeLoadingId(story.id);
       setError('');
-      await getStoryById(storyId);
-      dispatch({ type: 'RESUME_STORY', payload: { storyId } });
+      
+      // Load story to verify it exists and update state
+      await getStoryById(story.id);
+      dispatch({ type: 'RESUME_STORY', payload: { storyId: story.id } });
       dispatch({ type: 'TRANSITION_TO_PLAYING' });
+      
+      // Navigate to story page using slug
+      navigate(`/story/${story.slug}`);
     } catch (resumeError) {
       console.error('Story resume failed:', resumeError);
       setError('The tale resists awakening. Try once more.');
@@ -217,7 +226,7 @@ export default function Dashboard() {
 
                   <Button
                     className="mt-5 w-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleResumeStory(story.id)}
+                    onClick={() => handleResumeStory(story)}
                     disabled={state.isTransitioning || resumeLoadingId === story.id}
                   >
                     {resumeLoadingId === story.id ? 'Resuming...' : 'Resume'}

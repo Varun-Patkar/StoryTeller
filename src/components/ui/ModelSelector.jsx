@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppState } from '@/services/appState.jsx';
 import { getAvailableModels } from '@/services/mockApi';
 
@@ -15,6 +16,7 @@ import { getAvailableModels } from '@/services/mockApi';
  */
 export default function ModelSelector() {
   const { state, dispatch } = useAppState();
+  const navigate = useNavigate();
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -55,7 +57,7 @@ export default function ModelSelector() {
   const selectedModelId = state.selectedModel?.id || '';
 
   /**
-   * Handles model pick, persists selection, and starts transition.
+   * Handles model pick, persists selection, and navigates to dashboard.
    *
    * @param {string} modelId - Selected model identifier
    * @returns {void}
@@ -66,8 +68,15 @@ export default function ModelSelector() {
       return;
     }
 
+    try {
+      localStorage.setItem('selectedModel', JSON.stringify(model));
+    } catch (storageError) {
+      console.warn('Failed to persist selected model:', storageError);
+    }
+
     dispatch({ type: 'MODEL_SELECTED', payload: { model } });
     dispatch({ type: 'TRANSITION_TO_DASHBOARD' });
+    navigate('/dashboard');
   };
 
   return (

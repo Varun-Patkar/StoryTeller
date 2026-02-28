@@ -63,6 +63,7 @@ export default function BootSequence() {
       state.connectionStatus === 'ONLINE' &&
       !state.isTransitioning
     ) {
+      // Transition to model selection phase (stays at same URL)
       dispatch({ type: 'TRANSITION_TO_SELECTING_SOURCE' });
     }
   }, [state.phase, state.connectionStatus, state.isTransitioning, dispatch]);

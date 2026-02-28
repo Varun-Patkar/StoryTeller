@@ -1,7 +1,9 @@
 # Contract: URL Routing & Navigation
 
 **Phase 1 Output** | **Created**: 2026-02-28  
-**Purpose**: Define URL structure, routing configuration, and navigation patterns for StoryTeller
+**Purpose**: Define URL structure, routing configuration, and navigation patterns for Story Teller
+
+**Implementation Note**: This document was created during planning phase. The actual implementation simplified the URL structure: Boot sequence and model selection both use `/` (phase-based rendering), and story setup uses `/new` instead of `/setup`. The core routing tables have been updated to reflect this, but some code examples may reference the original design. See [actual implementation](../../../src/routes.jsx) for authoritative source.
 
 ---
 
@@ -17,12 +19,13 @@ StoryTeller uses URL-based routing to provide standard web navigation behaviors:
 
 | Route | Phase | Component | Description | Prerequisites |
 |-------|-------|-----------|-------------|---------------|
-| `/` | CHECKING_ENGINE | BootSequence | Boot sequence with connection check | None |
-| `/model-select` | SELECTING_SOURCE | ModelSelector | AI model selection | Connection online |
-| `/dashboard` | DASHBOARD | Dashboard | Story hub (resume/create) | Model selected |
-| `/setup` | SETUP | StorySetup | Story creation form | Model selected |
-| `/story/:slug` | PLAYING | StoryReader | Interactive reading interface | Valid story exists |
-| `*` | - | NotFound | 404 error page | - |
+| `/` | CHECKING_ENGINE / SELECTING_SOURCE | BootSequence / ModelSelector | Boot sequence + model selection (phase-based rendering) | None |
+| `/dashboard` | DASHBOARD | Dashboard | Story hub (resume/create) | Connection online, model selected |
+| `/new` | SETUP | StorySetup | Story creation form | Connection online, model selected |
+| `/story/:slug` | PLAYING | StoryReader | Interactive reading interface | Connection online, model selected |
+| `*` | - | NotFound (or redirect) | 404 error page for authenticated users | - |
+
+**Note**: `/` handles both boot and model selection at the same URL. Component rendering switches based on phase state.
 
 ### Route Parameters
 
@@ -103,28 +106,25 @@ Routes that require certain conditions to be met before access:
 
 ```javascript
 const routeGuards = {
-  '/model-select': {
-    check: () => connectionStatus === 'ONLINE',
-    redirect: '/',
-    message: 'Connection required'
-  },
   '/dashboard': {
-    check: () => selectedModel !== null,
+    check: () => connectionStatus === 'ONLINE' && selectedModel !== null,
     redirect: '/',
-    message: 'Model selection required'
+    message: 'Connection and model selection required'
   },
-  '/setup': {
-    check: () => selectedModel !== null,
-    redirect: '/dashboard',
-    message: 'Model selection required'
+  '/new': {
+    check: () => connectionStatus === 'ONLINE' && selectedModel !== null,
+    redirect: '/',
+    message: 'Connection and model selection required'
   },
   '/story/:slug': {
-    check: (slug) => storyExists(slug),
-    redirect: '/dashboard',
-    message: 'Story not found'
+    check: () => connectionStatus === 'ONLINE' && selectedModel !== null,
+    redirect: '/',
+    message: 'Connection and model selection required. Story existence validated internally.'
   }
 };
 ```
+
+**Note**: Story existence for `/story/:slug` is validated internally by `StoryReader` component, not by route protection. This allows the component to show appropriate error messages.
 
 ### ProtectedRoute Component
 
@@ -253,7 +253,7 @@ function useRouteTransitions() {
 }
 
 function detectBackNavigation(currentLocation, previousPath) {
-  const routeOrder = ['/', '/model-select', '/dashboard', '/setup', '/story/:slug'];
+  const routeOrder = ['/', '/dashboard', '/new', '/story/:slug'];
   const currentIndex = routeOrder.findIndex(r => matchRoute(currentLocation.pathname, r));
   const previousIndex = routeOrder.findIndex(r => matchRoute(previousPath, r));
   
@@ -298,10 +298,9 @@ function AppStateProvider({ children }) {
 
 function routeToPhase(pathname) {
   const routes = {
-    '/': 'CHECKING_ENGINE',
-    '/model-select': 'SELECTING_SOURCE',
+    '/': 'CHECKING_ENGINE', // Also handles SELECTING_SOURCE at same URL
     '/dashboard': 'DASHBOARD',
-    '/setup': 'SETUP',
+    '/new': 'SETUP',
   };
   
   if (pathname.startsWith('/story/')) {

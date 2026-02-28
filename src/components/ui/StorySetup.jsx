@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppState } from '@/services/appState.jsx';
 import { validateStorySetup } from '@/utils/validation';
 import { createStory } from '@/services/mockApi';
@@ -20,6 +21,7 @@ import TextArea from '@/components/common/TextArea';
  */
 export default function StorySetup() {
   const { state, dispatch } = useAppState();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     fandom: '',
     character: '',
@@ -131,9 +133,10 @@ export default function StorySetup() {
 
       console.log('Story created:', story);
 
-      // Store story ID and transition to reading phase
+      // Store story ID and navigate to story page using slug
       dispatch({ type: 'STORY_CREATED', payload: { storyId: story.id } });
       dispatch({ type: 'TRANSITION_TO_PLAYING' });
+      navigate(`/story/${story.slug}`);
     } catch (error) {
       console.error('Story creation failed:', error);
       setErrors({
@@ -145,8 +148,7 @@ export default function StorySetup() {
   };
 
   /**
-   * Handles back button click to return to Dashboard.
-   * Triggers reverse camera animation (surface → Earth orbit).
+   * Handles back button click to return to Dashboard via /dashboard route.
    *
    * @returns {void}
    */
@@ -154,7 +156,9 @@ export default function StorySetup() {
     if (state.isTransitioning || isSubmitting) {
       return;
     }
+    // Navigate back to dashboard with animation
     dispatch({ type: 'TRANSITION_TO_DASHBOARD' });
+    navigate('/dashboard');
   };
 
   return (

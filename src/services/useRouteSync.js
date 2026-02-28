@@ -1,99 +1,97 @@
 import { useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useAppState } from './appState.jsx';
 
 /**
  * useRouteSync: Synchronize URL with app state machine
  * 
- * Keeps the URL and phase state in sync bidirectionally:
- * - When URL changes → update phase
- * - When phase changes → update URL
+ * Keeps the phase state in sync with URL changes with proper animations:
+ * - When URL changes → trigger transition with camera animations
+ * 
+ * Components use navigate() + transition dispatches for programmatic navigation.
+ * This hook handles browser-initiated navigation (back/forward/manual URL entry).
  * 
  * This enables:
- * - Browser back/forward buttons work correctly
- * - Direct URL access to any phase
- * - Bookmarkable states
- * - Shareable URLs
+ * - Browser back/forward buttons trigger animations correctly
+ * - Direct URL access triggers appropriate entry animation
+ * - Bookmarkable states with cinematic transitions
  * 
  * @returns {void}
  */
 export function useRouteSync() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { state, dispatch } = useAppState();
 
   /**
    * Map URL paths to app phases
+   * Note: '/' is handled explicitly to avoid invalid back-transitions
    */
   const pathToPhase = {
-    '/': 'CHECKING_ENGINE',
-    '/select-model': 'SELECTING_SOURCE',
     '/dashboard': 'DASHBOARD',
-    '/setup': 'SETUP',
+    '/new': 'SETUP',
   };
 
   /**
-   * Map app phases to URL paths
+   * Map phases to their transition action types
    */
-  const phaseToPath = {
-    'CHECKING_ENGINE': '/',
-    'SELECTING_SOURCE': '/select-model',
-    'DASHBOARD': '/dashboard',
-    'SETUP': '/setup',
-    'PLAYING': null, // PLAYING phase uses dynamic /story/:slug URL
+  const phaseToTransition = {
+    'CHECKING_ENGINE': 'TRANSITION_TO_CHECKING_ENGINE',
+    'SELECTING_SOURCE': 'TRANSITION_TO_SELECTING_SOURCE',
+    'DASHBOARD': 'TRANSITION_TO_DASHBOARD',
+    'SETUP': 'TRANSITION_TO_SETUP',
+    'PLAYING': 'TRANSITION_TO_PLAYING',
   };
 
   /**
-   * Sync URL changes to phase state
+   * Sync URL changes to phase state with animations
    * Triggered when user navigates via browser (back/forward/manual URL entry)
    */
   useEffect(() => {
     const currentPath = location.pathname;
+
+    // Wait for model hydration before applying URL-driven transitions
+    if (!state.isModelHydrated) {
+      return;
+    }
     
     // Handle story URLs separately (dynamic slug)
     if (currentPath.startsWith('/story/')) {
-      if (state.phase !== 'PLAYING') {
-        // URL indicates story reading, update phase if needed
-        // Don't dispatch here as ProtectedRoute will handle redirects
+      if (state.phase !== 'PLAYING' && !state.isTransitioning) {
+        dispatch({ type: 'TRANSITION_TO_PLAYING' });
       }
       return;
     }
 
-    // Map URL to phase
+    // Smart "/" handling: avoid invalid transitions back to CHECKING_ENGINE
+    if (currentPath === '/') {
+      if (state.connectionStatus === 'ONLINE') {
+        // If redirected to model selection due to missing model, skip animation
+        if (!state.selectedModel && state.phase !== 'SELECTING_SOURCE') {
+          dispatch({ type: 'SYNC_PHASE_FROM_URL', payload: { phase: 'SELECTING_SOURCE' } });
+        } else if (state.phase !== 'SELECTING_SOURCE' && !state.isTransitioning) {
+          dispatch({ type: 'TRANSITION_TO_SELECTING_SOURCE' });
+        }
+      } else {
+        // Only transition to CHECKING_ENGINE if we are not already at boot or model selection
+        const isAlreadyAtRootPhase = state.phase === 'CHECKING_ENGINE' || state.phase === 'SELECTING_SOURCE';
+        if (!isAlreadyAtRootPhase && !state.isTransitioning) {
+          dispatch({ type: 'TRANSITION_TO_CHECKING_ENGINE' });
+        }
+      }
+      return;
+    }
+
+    // Map URL to phase (standard routing)
     const targetPhase = pathToPhase[currentPath];
     
     if (targetPhase && targetPhase !== state.phase && !state.isTransitioning) {
-      // URL changed, update phase to match
-      // Note: This won't trigger animations, just updates state
-      // For animated transitions, components should use dispatch with transition actions
-      dispatch({ type: 'SYNC_PHASE_FROM_URL', payload: { phase: targetPhase } });
+      // URL changed, trigger transition with animation
+      const transitionAction = phaseToTransition[targetPhase];
+      if (transitionAction) {
+        dispatch({ type: transitionAction });
+      }
     }
-  }, [location.pathname, state.phase, state.isTransitioning]);
-
-  /**
-   * Sync phase changes to URL
-   * Triggered when app state changes programmatically
-   */
-  useEffect(() => {
-    const currentPath = location.pathname;
-    const targetPath = phaseToPath[state.phase];
-
-    // Skip if phase doesn't map to a static path (e.g., PLAYING uses slug)
-    if (targetPath === null) {
-      return;
-    }
-
-    // Skip if already at the correct URL
-    if (targetPath === currentPath) {
-      return;
-    }
-
-    // Skip if transitioning (wait for transition to complete)
-    if (state.isTransitioning) {
-      return;
-    }
-
-    // Phase changed, update URL to match
-    navigate(targetPath, { replace: false });
-  }, [state.phase, state.isTransitioning]);
+    // Only re-run when URL changes, not when phase/transition state changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, dispatch, state.connectionStatus, state.isModelHydrated, state.selectedModel, state.phase, state.isTransitioning]);
 }

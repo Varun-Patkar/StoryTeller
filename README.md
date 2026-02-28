@@ -15,6 +15,7 @@ StoryTeller is a web application that combines AI-driven narrative generation wi
 
 ### 🤖 AI Integration
 - **Ollama Model Selection**: Choose from available AI models (llama3:8b, mistral:7b)
+- **Model Persistence**: Selected model is stored in localStorage and validated on startup
 - **Story Generation**: AI-powered prologue creation based on your character, premise, and goals
 - **Multiple Fandoms**: Create stories in various universes (Douluo Dalu, Naruto, One Piece, etc.)
 
@@ -93,7 +94,8 @@ StoryTeller/
 │   │   ├── spaceToEarth.js
 │   │   ├── earthToSurface.js
 │   │   ├── surfaceToEarth.js
-│   │   └── surfaceToStory.js
+│   │   ├── surfaceToStory.js
+│   │   └── storyToEarth.js # Reverse animation from story
 │   ├── canvas/             # Three.js scene components
 │   │   ├── CanvasScene.jsx
 │   │   ├── Scene.jsx
@@ -103,24 +105,31 @@ StoryTeller/
 │   │   ├── common/         # Reusable components
 │   │   │   ├── Button.jsx
 │   │   │   ├── Dropdown.jsx
-│   │   │   └── TextArea.jsx
+│   │   │   ├── TextArea.jsx
+│   │   │   ├── StreamingText.jsx
+│   │   │   └── ChoiceButton.jsx
 │   │   ├── ui/             # Phase-specific screens
 │   │   │   ├── BootSequence.jsx
 │   │   │   ├── ModelSelector.jsx
 │   │   │   ├── Dashboard.jsx
 │   │   │   ├── StorySetup.jsx
-│   │   │   └── StoryReader.jsx
-│   │   ├── UIRouter.jsx    # Phase-based routing
+│   │   │   ├── StoryReader.jsx
+│   │   │   ├── StoryPassage.jsx
+│   │   │   └── NotFound.jsx
+│   │   ├── UIRouter.jsx    # React Router configuration
 │   │   └── ErrorBoundary.jsx
 │   ├── services/
 │   │   ├── appState.jsx    # Global state management
 │   │   ├── mockApi.js      # API functions (mocked)
-│   │   └── usePhaseTransition.js
+│   │   ├── usePhaseTransition.js
+│   │   └── useRouteSync.js # URL/state synchronization
 │   ├── utils/
 │   │   ├── validation.js   # Form validation
-│   │   └── animations.js   # Animation helpers
+│   │   ├── animations.js   # Animation helpers
+│   │   └── slugify.js      # URL slug generation
 │   ├── styles/
 │   │   └── index.css       # Global styles
+│   ├── routes.jsx          # Route definitions
 │   ├── App.jsx             # Root component
 │   └── main.jsx            # Entry point
 ├── specs/                  # Specification documents
@@ -151,6 +160,63 @@ Global state managed via React Context + useReducer:
 - Story data
 - User stories
 - Error handling
+
+### URL Routing
+
+The app uses React Router for URL-based navigation, enabling bookmarking and sharing:
+
+#### Routes
+
+- **`/`** - Boot sequence and model selection
+  - Checks Ollama connection
+  - Shows model selector after successful connection
+  - Redirects to `/dashboard` if a saved model is already hydrated
+  
+- **`/dashboard`** - Story management hub
+  - View all existing stories
+  - Resume reading or create new story
+  - Requires: Connection online, model selected
+  
+- **`/new`** - Story creation form
+  - Character, premise, and goals input
+  - Form validation with mystical error messages
+  - Requires: Connection online, model selected
+  
+- **`/story/:slug`** - Immersive reading interface
+  - Story-specific URL (e.g., `/story/mystical-encounters`)
+  - Interactive reading with streaming text and choices
+  - Shareable and bookmarkable
+  - Malformed slugs redirect to `/`
+  - Requires: Connection online, model selected
+  
+- **`*`** - 404 Not Found
+  - Mystical "Tale Lost to the Void" message
+  - Shown for invalid routes (authenticated users only)
+  - Unauthenticated users redirected to `/`
+
+#### Story Slugs
+
+Stories are identified by URL-safe slugs generated from titles:
+- Lowercase, hyphenated (e.g., "Douluo Dalu" → `douluo-dalu-the-soul-forge`)
+- Special characters removed
+- Truncated to 60 characters
+- Collision handling with numeric suffixes (e.g., `-2`, `-3`)
+- Invalid slugs redirect to `/` (then to `/dashboard` if a saved model exists)
+
+#### Navigation Features
+
+- **Browser History**: Back/forward buttons trigger animations
+- **Direct URL Access**: Paste any story URL to jump directly to it
+- **Bookmarks**: Save and return to specific stories
+- **Deep Linking**: Share `/story/:slug` URLs with others
+
+#### Animation Transitions
+
+URL changes trigger cinematic camera animations:
+- Model selector → Dashboard: Space zoom to Earth orbit
+- Dashboard → Story setup: Zoom to planet surface
+- Story setup → Reading: Final zoom with Earth fade
+- Backward navigation: Appropriate reverse animations
 
 ---
 
@@ -206,11 +272,13 @@ export default function ComponentName({ prop1, prop2 }) {
 
 Current implementation uses mocked backend responses:
 
-- `checkOllamaConnection()`: Simulates connection check
+- `checkOllamaConnection()`: Simulates connection check (80% success rate)
 - `getAvailableModels()`: Returns hardcoded model list
-- `getUserStories()`: Returns sample story data
-- `createStory(setup)`: Generates mock prologue
-- `getStoryById(id)`: Returns story details
+- `getUserStories()`: Returns sample story data with slugs
+- `createStory(setup)`: Generates mock prologue with unique slug
+- `getStoryById(id)`: Returns story details by ID
+- `getStoryBySlug(slug)`: Returns story details by URL slug
+- `getNextPassage(storyId, choiceId)`: Generates next story passage with choices
 
 All API calls include realistic delays (800-1500ms).
 
@@ -227,10 +295,9 @@ All API calls include realistic delays (800-1500ms).
 ## Known Limitations
 
 ### MVP Scope
-- **No real AI**: Backend integration pending
-- **No persistence**: Stories not saved between sessions
-- **No choices**: Reading interface displays prologue only
-- **No backwards navigation**: Cannot return to previous phases (except SETUP → DASHBOARD)
+- **No real AI**: Backend integration pending (uses lorem ipsum)
+- **No persistence**: Stories not saved between browser sessions
+- **Limited fandoms**: Predefined list, cannot add custom fandoms
 
 ### Performance
 - **3D model**: ~5MB GLB file (consider optimization)

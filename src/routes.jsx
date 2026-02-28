@@ -36,17 +36,10 @@ const StoryReader = lazy(() => import('./components/ui/StoryReader'));
 export const routes = [
   {
     path: '/',
-    component: BootSequence,
-    phase: 'CHECKING_ENGINE',
+    component: BootSequence, // Also shows ModelSelector after connection
+    phase: 'CHECKING_ENGINE', // Transitions to SELECTING_SOURCE at same URL
     protected: false,
     requires: [],
-  },
-  {
-    path: '/select-model',
-    component: ModelSelector,
-    phase: 'SELECTING_SOURCE',
-    protected: true,
-    requires: ['connectionOnline'], // Requires successful connection check
   },
   {
     path: '/dashboard',
@@ -56,7 +49,7 @@ export const routes = [
     requires: ['connectionOnline', 'modelSelected'], // Requires connection + model
   },
   {
-    path: '/setup',
+    path: '/new',
     component: StorySetup,
     phase: 'SETUP',
     protected: true,

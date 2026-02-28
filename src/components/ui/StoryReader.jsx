@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAppState } from '@/services/appState.jsx';
-import { getStoryById, getNextPassage } from '@/services/mockApi';
+import { getStoryBySlug, getNextPassage } from '@/services/mockApi';
+import { useDocumentTitle } from '@/utils/seo';
+import { isValidSlug } from '@/utils/slugify';
 import StoryPassage from '@/components/ui/StoryPassage';
 
 /**
@@ -26,7 +29,9 @@ import StoryPassage from '@/components/ui/StoryPassage';
  * @returns {JSX.Element} StoryReader UI
  */
 export default function StoryReader() {
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
+  const { slug } = useParams();
+  const navigate = useNavigate();
   const [story, setStory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,13 +44,15 @@ export default function StoryReader() {
   const currentPassageRef = useRef(null);
   const shouldAutoScrollRef = useRef(true);
 
+  // Update document title with story title
+  useDocumentTitle({ storyTitle: story?.title });
+
   useEffect(() => {
     let isMounted = true;
 
     /**
-     * Loads the current story from state.
-     * For newly created stories, the story object should be in state.
-     * For resumed stories, fetch from API using currentStoryId.
+     * Loads the current story using slug from URL params.
+     * This enables direct URL access and bookmarking.
      * 
      * @returns {Promise<void>}
      */
@@ -54,12 +61,14 @@ export default function StoryReader() {
         setLoading(true);
         setError(null);
 
-        if (!state.currentStoryId) {
-          throw new Error('No story ID found in state');
+        const normalizedSlug = String(slug || '').trim().toLowerCase();
+        if (!normalizedSlug || !isValidSlug(normalizedSlug)) {
+          navigate('/', { replace: true });
+          return;
         }
 
-        // Fetch story details
-        const storyData = await getStoryById(state.currentStoryId);
+        // Fetch story details using slug
+        const storyData = await getStoryBySlug(normalizedSlug);
         
         if (!isMounted) return;
 
@@ -85,7 +94,7 @@ export default function StoryReader() {
     return () => {
       isMounted = false;
     };
-  }, [state.currentStoryId]);
+  }, [slug, navigate]);
 
   /**
    * Auto-scroll to current passage when new passage is added
@@ -227,22 +236,15 @@ export default function StoryReader() {
     }
   };
 
-  // Loading state
+  // Loading state: keep StoryReader invisible until content is ready
   if (loading) {
-    return (
-      <div className="w-screen h-screen bg-gradient-to-b from-gray-900 via-blue-950 to-black flex items-center justify-center animate-[fadeIn_0.8s_ease-in]">
-        <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <p className="text-blue-200 text-lg">Unveiling your tale...</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // Error state (initial load)
   if (error && !story) {
     return (
-      <div className="w-screen h-screen bg-gradient-to-b from-gray-900 via-blue-950 to-black flex items-center justify-center animate-[fadeIn_0.8s_ease-in]">
+      <div className="fixed inset-0 z-20 bg-gradient-to-b from-gray-900 via-blue-950 to-black flex items-center justify-center animate-[fadeIn_0.8s_ease-in]">
         <div className="text-center max-w-md px-6">
           <p className="text-red-400 text-xl mb-4">{error}</p>
           <p className="text-blue-200">Close this window and try again.</p>
@@ -253,12 +255,35 @@ export default function StoryReader() {
 
   const currentPassageIndex = story?.currentPassageIndex ?? 0;
 
+  /**
+   * Navigate back to dashboard with reverse animation
+   */
+  const handleBackToDashboard = () => {
+    dispatch({ type: 'TRANSITION_TO_DASHBOARD' });
+    navigate('/dashboard');
+  };
+
   // Story display with passages
+  // Fade in only after animation completes
+  const isAnimationComplete = !state.isTransitioning;
   return (
     <div 
       ref={scrollContainerRef}
-      className="story-scrollbar w-screen h-screen bg-gradient-to-b from-gray-900 via-blue-950 to-black overflow-y-auto animate-[fadeIn_1.2s_ease-in]"
+      className={`story-scrollbar fixed inset-0 z-20 bg-gradient-to-b from-gray-900 via-blue-950 to-black overflow-y-auto transition-opacity duration-500 ${
+        isAnimationComplete ? 'animate-[fadeIn_1.2s_ease-in]' : 'opacity-0 pointer-events-none'
+      }`}
     >
+      {/* Back to Dashboard Button */}
+      <button
+        type="button"
+        onClick={handleBackToDashboard}
+        disabled={state.isTransitioning}
+        className="fixed top-6 left-6 z-50 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors font-medium"
+        title="Return to Dashboard"
+      >
+        ← Dashboard
+      </button>
+
       <div className="min-h-screen flex items-start justify-center px-6 py-12">
         <article className="w-[80vw] max-w-[80vw] mx-auto">
           
@@ -311,7 +336,7 @@ export default function StoryReader() {
       </div>
 
       {/* Go to latest passage button - Fixed positioning outside article */}
-      {canScroll && !isNearBottom && (
+      {canScroll && !isNearBottom && isAnimationComplete && (
         <div className="fixed bottom-8 right-8 z-50">
           <button
             type="button"

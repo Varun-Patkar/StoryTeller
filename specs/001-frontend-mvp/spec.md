@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-frontend-mvp`  
 **Created**: 2026-02-28  
-**Status**: Draft  
+**Status**: Complete  
 **Input**: User description: "Build the frontend UI/UX for 'StoryTeller', a web-based text adventure. The backend and LLM are mocked for this MVP phase. Focus entirely on the cinematic flow and UI."
 
 ## User Scenarios & Testing *(mandatory)*

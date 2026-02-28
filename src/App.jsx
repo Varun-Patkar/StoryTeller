@@ -1,7 +1,9 @@
 import { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { AppStateProvider, useAppState } from '@/services/appState.jsx';
+import { getAvailableModels } from '@/services/mockApi';
 import { useRouteSync } from '@/services/useRouteSync';
+import { useDocumentTitle } from '@/utils/seo';
 import UIRouter from '@/components/UIRouter';
 
 // Lazy load Canvas to avoid circular dependency issues
@@ -30,22 +32,78 @@ function isWebGLAvailable() {
  * Synchronizes URL with app state machine
  */
 function AppContent() {
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
   const [webglSupported, setWebglSupported] = useState(true);
   
   // Sync URL with app state bidirectionally
   useRouteSync();
   
+  // Update document title based on current route
+  useDocumentTitle();
+  
   useEffect(() => {
     setWebglSupported(isWebGLAvailable());
   }, []);
 
-  const showCanvas = state.phase !== 'PLAYING' && webglSupported;
+  useEffect(() => {
+    let isMounted = true;
+
+    /**
+     * Hydrates the selected model from localStorage and validates it against API.
+     * Ensures model selection is one-time unless the model no longer exists.
+     *
+     * @returns {Promise<void>}
+     */
+    async function hydrateSelectedModel() {
+      dispatch({ type: 'MODEL_HYDRATE_START' });
+
+      let savedModel = null;
+      try {
+        const rawModel = localStorage.getItem('selectedModel');
+        savedModel = rawModel ? JSON.parse(rawModel) : null;
+      } catch (storageError) {
+        console.warn('Failed to read saved model from storage:', storageError);
+        savedModel = null;
+      }
+
+      if (!savedModel) {
+        if (isMounted) {
+          dispatch({ type: 'MODEL_HYDRATE_COMPLETE', payload: { model: null } });
+        }
+        return;
+      }
+
+      try {
+        const availableModels = await getAvailableModels();
+        if (!isMounted) return;
+
+        const matchingModel = availableModels.find(model => model.id === savedModel.id);
+        if (matchingModel) {
+          dispatch({ type: 'MODEL_HYDRATE_COMPLETE', payload: { model: matchingModel } });
+          return;
+        }
+
+        localStorage.removeItem('selectedModel');
+        dispatch({ type: 'MODEL_HYDRATE_COMPLETE', payload: { model: null } });
+      } catch (loadError) {
+        console.error('Failed to validate saved model:', loadError);
+        if (isMounted) {
+          dispatch({ type: 'MODEL_HYDRATE_COMPLETE', payload: { model: null } });
+        }
+      }
+    }
+
+    hydrateSelectedModel();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [dispatch]);
 
   return (
     <div className="w-screen h-screen overflow-hidden relative">
       {/* WebGL Not Supported Warning */}
-      {!webglSupported && state.phase !== 'PLAYING' && (
+      {!webglSupported && (
         <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-black flex items-center justify-center z-0">
           <p className="text-blue-200 text-center px-6">
             3D visualization unavailable. Your browser does not support WebGL.
@@ -53,14 +111,16 @@ function AppContent() {
         </div>
       )}
 
-      {/* 3D Canvas Layer: Hidden during PLAYING phase or if WebGL not supported */}
-      {showCanvas && (
-        <Suspense fallback={null}>
-          <CanvasScene />
-        </Suspense>
+      {/* 3D Canvas Layer: Always visible in background */}
+      {webglSupported && (
+        <div className="absolute inset-0 z-0">
+          <Suspense fallback={null}>
+            <CanvasScene />
+          </Suspense>
+        </div>
       )}
 
-      {/* UI Overlay Layer: Phase-based screens and interactions */}
+      {/* UI Overlay Layer: Always on top of canvas with proper stacking context */}
       <div className="absolute top-0 left-0 z-10 w-full h-full pointer-events-auto">
         <UIRouter />
       </div>

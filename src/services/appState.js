@@ -21,6 +21,7 @@ const initialState = {
   transitionTarget: null,
   connectionStatus: 'CHECKING',
   selectedModel: null,
+  isModelHydrated: false,
   selectedFandom: null,
   storySetup: null,
   currentStoryId: null,
@@ -96,6 +97,20 @@ function appStateReducer(state, action) {
       return {
         ...state,
         selectedModel: action.payload.model,
+        error: null,
+      };
+
+    case 'MODEL_HYDRATE_START':
+      return {
+        ...state,
+        isModelHydrated: false,
+      };
+
+    case 'MODEL_HYDRATE_COMPLETE':
+      return {
+        ...state,
+        selectedModel: action.payload?.model || null,
+        isModelHydrated: true,
         error: null,
       };
 

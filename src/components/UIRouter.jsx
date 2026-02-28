@@ -6,11 +6,10 @@
  * StorySetup and StoryReader are lazy-loaded to reduce initial bundle size.
  * 
  * Route Flow:
- * 1. / → BootSequence (connection check)
- * 2. /select-model → ModelSelector (AI model selection)
- * 3. /dashboard → Dashboard (resume/create options)
- * 4. /setup → StorySetup (form collection)
- * 5. /story/:slug → StoryReader (immersive reading interface)
+ * 1. / → BootSequence + ModelSelector (both at root, phase-based)
+ * 2. /dashboard → Dashboard (resume/create options)
+ * 3. /new → StorySetup (form collection)
+ * 4. /story/:slug → StoryReader (immersive reading interface)
  * 
  * Protection:
  * - Routes check prerequisites before rendering
@@ -24,10 +23,37 @@ import { useAppState } from '@/services/appState.jsx';
 import BootSequence from '@/components/ui/BootSequence';
 import ModelSelector from '@/components/ui/ModelSelector';
 import Dashboard from '@/components/ui/Dashboard';
+import NotFound from '@/components/ui/NotFound';
 
 // Lazy load heavy components to reduce initial bundle size
 const StorySetup = lazy(() => import('@/components/ui/StorySetup'));
 const StoryReader = lazy(() => import('@/components/ui/StoryReader'));
+
+/**
+ * RootRoute: Handles both boot sequence and model selection at root URL
+ * Intelligently switches based on connection status and phase.
+ * 
+ * Smart behavior:
+ * - If connection never checked: show BootSequence
+ * - If connection online but no phase yet: show BootSequence
+ * - If connection online and phase is SELECTING_SOURCE: show ModelSelector
+ * - If redirected back due to no model, but connection is online: skip boot and show ModelSelector
+ */
+function RootRoute() {
+  const { state } = useAppState();
+  
+  // If connection is ONLINE, skip boot sequence and show model selector
+  // This handles the case where user was redirected back due to missing model
+  if (state.connectionStatus === 'ONLINE') {
+    if (state.isModelHydrated && state.selectedModel) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return <ModelSelector />;
+  }
+  
+  // Show boot sequence by default (checking connection or offline)
+  return <BootSequence />;
+}
 
 /**
  * ProtectedRoute: Wrapper for routes requiring prerequisites
@@ -44,13 +70,16 @@ function ProtectedRoute({ component: Component, requires = [] }) {
   const { state } = useAppState();
   
   // Check connection requirement
-  if (requires.includes('connectionOnline') && state.connectionStatus !== 'online') {
+  if (requires.includes('connectionOnline') && state.connectionStatus !== 'ONLINE') {
     return <Navigate to="/" replace />;
   }
   
   // Check model selection requirement
   if (requires.includes('modelSelected') && !state.selectedModel) {
-    return <Navigate to="/select-model" replace />;
+    if (!state.isModelHydrated) {
+      return null;
+    }
+    return <Navigate to="/" replace />;
   }
   
   // Check story existence requirement
@@ -63,6 +92,24 @@ function ProtectedRoute({ component: Component, requires = [] }) {
 }
 
 /**
+ * CatchAllRoute: Handles unknown routes intelligently
+ * Shows 404 if user is authenticated, redirects to home if not
+ */
+function CatchAllRoute() {
+  const { state } = useAppState();
+  
+  // If user has completed prerequisites, show 404
+  // Otherwise redirect to home (they haven't started yet)
+  const isAuthenticated = state.connectionStatus === 'ONLINE' && state.selectedModel;
+  
+  if (isAuthenticated) {
+    return <NotFound />;
+  }
+  
+  return <Navigate to="/" replace />;
+}
+
+/**
  * UIRouter: Main routing component
  * Uses React Router for URL-based navigation
  */
@@ -72,19 +119,8 @@ export default function UIRouter() {
       {/* Define all application routes */}
       <Suspense fallback={null}>
         <Routes>
-          {/* Root: Boot sequence */}
-          <Route path="/" element={<BootSequence />} />
-          
-          {/* Model selection: Requires successful connection */}
-          <Route 
-            path="/select-model" 
-            element={
-              <ProtectedRoute 
-                component={ModelSelector} 
-                requires={['connectionOnline']} 
-              />
-            } 
-          />
+          {/* Root: Boot sequence + Model selector (phase-based) */}
+          <Route path="/" element={<RootRoute />} />
           
           {/* Dashboard: Requires connection and model */}
           <Route 
@@ -99,7 +135,7 @@ export default function UIRouter() {
           
           {/* Story setup: Requires connection and model */}
           <Route 
-            path="/setup" 
+            path="/new" 
             element={
               <ProtectedRoute 
                 component={StorySetup} 
@@ -108,19 +144,19 @@ export default function UIRouter() {
             } 
           />
           
-          {/* Story reader: Requires everything */}
+          {/* Story reader: Requires connection and model (story validated internally) */}
           <Route 
             path="/story/:slug" 
             element={
               <ProtectedRoute 
                 component={StoryReader} 
-                requires={['connectionOnline', 'modelSelected', 'storyExists']} 
+                requires={['connectionOnline', 'modelSelected']} 
               />
             } 
           />
           
-          {/* 404: Redirect unknown routes to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* 404: Show NotFound for authenticated users, redirect others */}
+          <Route path="*" element={<CatchAllRoute />} />
         </Routes>
       </Suspense>
     </div>

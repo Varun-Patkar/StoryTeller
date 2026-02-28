@@ -75,6 +75,13 @@ CHECKING_ENGINE → SELECTING_SOURCE → DASHBOARD → SETUP → PLAYING
 - UI components conditionally render based on current phase
 - State machine enforces valid transitions (no phase skipping)
 
+### 2.5 Routing + Model Persistence
+
+- URL changes drive phase transitions via `useRouteSync`
+- Invalid story slugs redirect to `/` (RootRoute sends to `/dashboard` when model is saved)
+- Selected model is persisted in localStorage and validated against `getAvailableModels()` on startup
+- Route sync waits for model hydration to prevent premature redirects
+
 ### 3. Modular File Organization
 
 Per constitution Principle I (Extreme Modularity):

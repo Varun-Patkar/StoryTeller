@@ -182,6 +182,28 @@
 
 ---
 
+## Routing Architecture (URL + State Machine Sync)
+
+**Goal**: Keep URL navigation, cinematic transitions, and state machine in sync without loops or invalid transitions.
+
+**Pattern**:
+- **URL is the source of truth for navigation intent**; `useRouteSync` listens to `location.pathname` and dispatches state transitions.
+- **State machine drives animations** via `transitionTarget`, with `usePhaseTransition` completing transitions on animation end.
+- **Redirects avoid animations** when the user is bounced to model selection due to missing prerequisites.
+
+**Key Behaviors**:
+- Direct URL access to `/story/:slug` triggers PLAYING transitions when the slug is valid.
+- Malformed slugs redirect to `/`; if a model is already persisted and valid, RootRoute sends the user to `/dashboard`.
+- Model selection is persisted in localStorage and validated against `getAvailableModels()` before allowing route transitions.
+- URL sync is paused until model hydration completes to avoid premature redirects.
+
+**Why This Works**:
+- Prevents transition loops caused by bidirectional URL/state updates.
+- Keeps cinematic animations aligned with real navigation intent.
+- Allows one-time model selection while still handling model removal scenarios.
+
+---
+
 ## Performance Considerations
 
 ### Research 9: 60 FPS Target on Mid-Tier Hardware

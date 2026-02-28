@@ -5,6 +5,7 @@ import { spaceToEarth } from '@/animations/spaceToEarth';
 import { earthToSurface } from '@/animations/earthToSurface';
 import { surfaceToEarth } from '@/animations/surfaceToEarth';
 import { surfaceToStory } from '@/animations/surfaceToStory';
+import { storyToEarth } from '@/animations/storyToEarth';
 
 /**
  * usePhaseTransition: Custom hook to trigger camera animations on phase changes
@@ -21,6 +22,8 @@ import { surfaceToStory } from '@/animations/surfaceToStory';
  * - DASHBOARD → SETUP: earthToSurface (z: 17 → 5)
  * - SETUP → DASHBOARD: surfaceToEarth (z: 5 → 17, reverse)
  * - SETUP → PLAYING: surfaceToStory (z: 5 → 1, fade Earth)
+ * - PLAYING → DASHBOARD: storyToEarth (z: 1 → 17, restore Earth)
+ * - PLAYING → SETUP: storyToEarth (z: 1 → 5, restore Earth)
  * 
  * @param {React.MutableRefObject} earthModelRef - Reference to Earth mesh/group for fade animation
  */
@@ -71,6 +74,9 @@ export function usePhaseTransition(earthModelRef) {
           if (state.phase === 'SETUP') {
             // SETUP → DASHBOARD: zoom back out (reverse of earthToSurface)
             timeline = surfaceToEarth(camera, handleAnimationComplete);
+          } else if (state.phase === 'PLAYING') {
+            // PLAYING → DASHBOARD: zoom out from story + restore Earth
+            timeline = storyToEarth(camera, earthModelRef.current, { x: 12.5, z: 17 }, handleAnimationComplete);
           } else {
             // SELECTING_SOURCE → DASHBOARD: space to Earth
             timeline = spaceToEarth(camera, handleAnimationComplete);
@@ -78,8 +84,14 @@ export function usePhaseTransition(earthModelRef) {
           break;
 
         case 'SETUP':
-          // DASHBOARD → SETUP: zoom into surface
-          timeline = earthToSurface(camera, handleAnimationComplete);
+          // Check source phase to determine animation
+          if (state.phase === 'PLAYING') {
+            // PLAYING → SETUP: zoom out from story to surface + restore Earth
+            timeline = storyToEarth(camera, earthModelRef.current, { x: 3, z: 5 }, handleAnimationComplete);
+          } else {
+            // DASHBOARD → SETUP: zoom into surface
+            timeline = earthToSurface(camera, handleAnimationComplete);
+          }
           break;
 
         case 'PLAYING':
