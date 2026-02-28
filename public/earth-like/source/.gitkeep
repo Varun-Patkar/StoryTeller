@@ -1,0 +1,11 @@
+/**
+ * Gitkeep file: Preserve earth-like/source directory in git
+ * 
+ * This directory is intended to contain the Earth GLB model file:
+ * - Untitled.glb (or similar 3D model for Earth rendering)
+ * 
+ * To add the model:
+ * 1. Obtain an Earth-like 3D model in GLB format
+ * 2. Place it in this directory as: Untitled.glb
+ * 3. OR update the path in src/canvas/EarthModel.jsx if using a different filename
+ */

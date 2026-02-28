@@ -89,6 +89,24 @@ api/
 
 ios/ or android/
 └── [platform-specific structure: feature modules, UI flows, platform tests]
+
+# [REMOVE IF UNUSED] Option 4: 3D Web Application (when Three.js/WebGL detected)
+src/
+├── canvas/              # Three.js scene setup, geometry, materials, lighting
+├── animations/          # GSAP timelines, camera movements, transitions
+├── components/
+│   ├── ui/             # React UI overlays (HUD, menus, controls)
+│   └── scene/          # React-Three-Fiber components (if applicable)
+├── services/           # API calls, state management
+├── utils/              # Helper functions, math utilities
+└── styles/             # Tailwind config, theme definitions
+
+tests/
+├── unit/
+└── integration/
+
+public/
+└── assets/             # 3D models, textures, shaders
 ```
 
 **Structure Decision**: [Document the selected structure and reference the real
