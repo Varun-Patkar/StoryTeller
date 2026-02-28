@@ -219,9 +219,9 @@
 
 ### Implementation for User Story 6
 
-- [ ] T101 [US6] Install React Router (react-router-dom) via terminal command: `npm i react-router-dom`
-- [ ] T102 [US6] Create routes configuration in src/routes.jsx defining all phase routes (/, /dashboard, /setup, /story/:slug)
-- [ ] T103 [US6] Wrap App.jsx with BrowserRouter and move phase rendering into Route components
+- [X] T101 [US6] Install React Router (react-router-dom) via terminal command: `npm i react-router-dom`
+- [X] T102 [US6] Create routes configuration in src/routes.jsx defining all phase routes (/, /dashboard, /setup, /story/:slug)
+- [X] T103 [US6] Wrap App.jsx with BrowserRouter and move phase rendering into Route components
 - [ ] T104 [US6] Create ProtectedRoute component that checks prerequisites (e.g., model selected) and redirects if not met
 - [ ] T105 [US6] Update AppStateProvider to sync with URL: listen to route changes and update phase state
 - [ ] T106 [US6] Add slug generation utility in src/utils/slugify.js (lowercase, hyphenate, remove special chars, truncate 60)

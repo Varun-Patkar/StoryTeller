@@ -231,6 +231,24 @@ function appStateReducer(state, action) {
         error: null,
       };
 
+    // ============ URL Synchronization ============
+
+    case 'SYNC_PHASE_FROM_URL':
+      // Update phase based on URL change (browser back/forward)
+      // Skips transition animations - instant phase change
+      const urlPhase = action.payload.phase;
+      if (urlPhase && urlPhase !== state.phase) {
+        return {
+          ...state,
+          previousPhase: state.phase,
+          phase: urlPhase,
+          isTransitioning: false,
+          transitionTarget: null,
+          timestamp: new Date().toISOString(),
+        };
+      }
+      return state;
+
     default:
       console.warn(`Unknown action type: ${action.type}`);
       return state;

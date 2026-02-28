@@ -1,19 +1,25 @@
 /**
- * UIRouter: Phase-based conditional rendering
+ * UIRouter: URL-based routing with React Router
  * 
- * Routes to different UI screens based on current app phase.
- * Each phase has its own isolated UI component.
+ * Routes to different UI screens based on URL path.
+ * Each route has its own isolated UI component with protection.
  * StorySetup and StoryReader are lazy-loaded to reduce initial bundle size.
  * 
- * Phase Flow:
- * 1. CHECKING_ENGINE → BootSequence (connection check)
- * 2. SELECTING_SOURCE → ModelSelector (AI model selection)
- * 3. DASHBOARD → Dashboard (resume/create options)
- * 4. SETUP → StorySetup (form collection)
- * 5. PLAYING → StoryReader (immersive reading interface)
+ * Route Flow:
+ * 1. / → BootSequence (connection check)
+ * 2. /select-model → ModelSelector (AI model selection)
+ * 3. /dashboard → Dashboard (resume/create options)
+ * 4. /setup → StorySetup (form collection)
+ * 5. /story/:slug → StoryReader (immersive reading interface)
+ * 
+ * Protection:
+ * - Routes check prerequisites before rendering
+ * - Invalid access redirects to appropriate starting point
+ * - State machine stays in sync with URL changes
  */
 
 import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAppState } from '@/services/appState.jsx';
 import BootSequence from '@/components/ui/BootSequence';
 import ModelSelector from '@/components/ui/ModelSelector';
@@ -24,50 +30,99 @@ const StorySetup = lazy(() => import('@/components/ui/StorySetup'));
 const StoryReader = lazy(() => import('@/components/ui/StoryReader'));
 
 /**
+ * ProtectedRoute: Wrapper for routes requiring prerequisites
+ * 
+ * Checks if user has completed required steps before rendering component.
+ * Redirects to appropriate starting point if prerequisites not met.
+ * 
+ * @param {Object} props
+ * @param {React.Component} props.component - Component to render if authorized
+ * @param {Array<string>} props.requires - Array of prerequisite checks
+ * @returns {JSX.Element} Protected component or redirect
+ */
+function ProtectedRoute({ component: Component, requires = [] }) {
+  const { state } = useAppState();
+  
+  // Check connection requirement
+  if (requires.includes('connectionOnline') && state.connectionStatus !== 'online') {
+    return <Navigate to="/" replace />;
+  }
+  
+  // Check model selection requirement
+  if (requires.includes('modelSelected') && !state.selectedModel) {
+    return <Navigate to="/select-model" replace />;
+  }
+  
+  // Check story existence requirement
+  if (requires.includes('storyExists') && !state.currentStoryId) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  // All prerequisites met, render component
+  return <Component />;
+}
+
+/**
  * UIRouter: Main routing component
- * Conditionally renders UI based on phase
+ * Uses React Router for URL-based navigation
  */
 export default function UIRouter() {
-  const { state } = useAppState();
-  const { phase } = state;
-
   return (
     <div className="w-full h-full relative">
-      {/* Phase-specific UI content */}
-      <div className="w-full h-full">
-        {/* Phase 1: Connection Check */}
-        {phase === 'CHECKING_ENGINE' && !state.isTransitioning && <BootSequence />}
-
-        {/* Phase 2: Model Selection */}
-        {phase === 'SELECTING_SOURCE' && !state.isTransitioning && <ModelSelector />}
-
-        {/* Phase 3: Story Dashboard */}
-        {phase === 'DASHBOARD' && !state.isTransitioning && <Dashboard />}
-
-        {/* Phase 4: Story Setup */}
-        {phase === 'SETUP' && !state.isTransitioning && (
-          <Suspense fallback={null}>
-            <StorySetup />
-          </Suspense>
-        )}
-
-        {/* Phase 5: Story Reading */}
-        {phase === 'PLAYING' && !state.isTransitioning && (
-          <Suspense fallback={null}>
-            <StoryReader />
-          </Suspense>
-        )}
-
-        {/* Fallback: Unknown phase */}
-        {!['CHECKING_ENGINE', 'SELECTING_SOURCE', 'DASHBOARD', 'SETUP', 'PLAYING'].includes(
-          phase
-        ) && (
-          <div className="flex items-center justify-center w-full h-full">
-            <p className="text-red-500">Unknown phase: {phase}</p>
-          </div>
-        )}
-      </div>
-
+      {/* Define all application routes */}
+      <Suspense fallback={null}>
+        <Routes>
+          {/* Root: Boot sequence */}
+          <Route path="/" element={<BootSequence />} />
+          
+          {/* Model selection: Requires successful connection */}
+          <Route 
+            path="/select-model" 
+            element={
+              <ProtectedRoute 
+                component={ModelSelector} 
+                requires={['connectionOnline']} 
+              />
+            } 
+          />
+          
+          {/* Dashboard: Requires connection and model */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute 
+                component={Dashboard} 
+                requires={['connectionOnline', 'modelSelected']} 
+              />
+            } 
+          />
+          
+          {/* Story setup: Requires connection and model */}
+          <Route 
+            path="/setup" 
+            element={
+              <ProtectedRoute 
+                component={StorySetup} 
+                requires={['connectionOnline', 'modelSelected']} 
+              />
+            } 
+          />
+          
+          {/* Story reader: Requires everything */}
+          <Route 
+            path="/story/:slug" 
+            element={
+              <ProtectedRoute 
+                component={StoryReader} 
+                requires={['connectionOnline', 'modelSelected', 'storyExists']} 
+              />
+            } 
+          />
+          
+          {/* 404: Redirect unknown routes to home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </div>
   );
 }

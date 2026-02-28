@@ -10,6 +10,8 @@
  * - MOCK_API_DELAY=number (custom delay in ms)
  */
 
+import { generateUniqueSlug, isValidSlug } from '@/utils/slugify';
+
 /**
  * Default simulated network delay (ms)
  * Realistic for local/LAN environments
@@ -20,8 +22,10 @@ const DEFAULT_DELAY = 1000;
  * In-memory story store for session persistence in MVP.
  * Stores stories created during current browser session so StoryReader
  * can load the actual generated content instead of fallback mock data.
+ * Maps both story IDs and slugs to story objects.
  */
 const storyStore = new Map();
+const slugToIdMap = new Map();
 
 /**
  * Helper: Add realistic network delay
@@ -156,6 +160,7 @@ export async function getUserStories() {
   return [
     {
       id: 'story-001',
+      slug: 'douluo-dalu-the-soul-forge',
       title: 'Douluo Dalu - The Soul Forge',
       fandom: 'Douluo Dalu',
       createdAt: '2026-02-27T14:30:00Z',
@@ -164,6 +169,7 @@ export async function getUserStories() {
     },
     {
       id: 'story-002',
+      slug: 'mystical-encounters',
       title: 'Mystical Encounters',
       fandom: 'Original',
       createdAt: '2026-02-26T10:15:00Z',
@@ -199,13 +205,19 @@ export async function createStory(setup) {
   await delay(randomDelay(1000, 1500));
 
   const storyId = `story-${Date.now()}`;
+  const storyTitle = `Journey in ${setup.fandom}`;
+  
+  // Generate unique slug from title
+  const existingSlugs = Array.from(slugToIdMap.keys());
+  const storySlug = generateUniqueSlug(storyTitle, existingSlugs);
 
   // MVP interactive reader uses lorem ipsum placeholders for all passages.
   const prologue = generateLoremIpsum(2, 4);
 
   const createdStory = {
     id: storyId,
-    title: `Journey in ${setup.fandom}`,
+    slug: storySlug,
+    title: storyTitle,
     fandom: setup.fandom,
     prologue,
     characterSetup: setup,
@@ -226,12 +238,13 @@ export async function createStory(setup) {
   };
 
   storyStore.set(storyId, createdStory);
+  slugToIdMap.set(storySlug, storyId);
 
   return createdStory;
 }
 
 /**
- * getStoryById: Retrieve previously saved story
+ * getStoryById: Retrieve previously saved story by ID
  * 
  * Fetches full story content including current passage.
  * Future: Load from database using story ID.
@@ -250,6 +263,7 @@ export async function getStoryById(storyId) {
   // Return mock story for MVP
   return {
     id: storyId,
+    slug: 'your-adventure-continues',
     title: 'Your Adventure Continues',
     fandom: 'Douluo Dalu',
     prologue: generateLoremIpsum(2, 4),
@@ -267,6 +281,83 @@ export async function getStoryById(storyId) {
     currentPassageIndex: 0,
     wordCount: 12,
   };
+}
+
+/**
+ * getStoryBySlug: Retrieve previously saved story by URL slug
+ * 
+ * Fetches full story content using slug instead of ID.
+ * Used for URL-based story access (/story/:slug).
+ * 
+ * @param {string} slug - Story URL slug
+ * @returns {Promise<Object>} Full Story object
+ * @throws {Error} If slug is invalid or story not found
+ */
+export async function getStoryBySlug(slug) {
+  if (!isValidSlug(slug)) {
+    throw new Error('Invalid story slug format');
+  }
+
+  await delay(randomDelay(800, 1200));
+
+  // Check if slug exists in map
+  const storyId = slugToIdMap.get(slug);
+  if (storyId) {
+    const storedStory = storyStore.get(storyId);
+    if (storedStory) {
+      return structuredClone(storedStory);
+    }
+  }
+
+  // Fallback for mock stories from getUserStories
+  if (slug === 'douluo-dalu-the-soul-forge') {
+    return {
+      id: 'story-001',
+      slug: 'douluo-dalu-the-soul-forge',
+      title: 'Douluo Dalu - The Soul Forge',
+      fandom: 'Douluo Dalu',
+      prologue: generateLoremIpsum(2, 4),
+      createdAt: '2026-02-27T14:30:00Z',
+      lastModified: '2026-02-27T15:45:00Z',
+      passages: [
+        {
+          id: 'passage-0',
+          text: generateLoremIpsum(2, 4),
+          choices: [],
+          selectedChoiceId: null,
+          selectedResponseText: null,
+        },
+      ],
+      currentPassageIndex: 0,
+      wordCount: 1247,
+    };
+  }
+
+  if (slug === 'mystical-encounters') {
+    return {
+      id: 'story-002',
+      slug: 'mystical-encounters',
+      title: 'Mystical Encounters',
+      fandom: 'Original',
+      prologue: generateLoremIpsum(2, 4),
+      createdAt: '2026-02-26T10:15:00Z',
+      lastModified: '2026-02-26T11:20:00Z',
+      passages: [
+        {
+          id: 'passage-0',
+          text: generateLoremIpsum(2, 4),
+          choices: [],
+          selectedChoiceId: null,
+          selectedResponseText: null,
+        },
+      ],
+      currentPassageIndex: 0,
+      wordCount: 892,
+    };
+  }
+
+  // Story not found
+  throw new Error(`Story with slug "${slug}" not found`);
 }
 
 /**
@@ -315,5 +406,6 @@ export default {
   getUserStories,
   createStory,
   getStoryById,
+  getStoryBySlug,
   getNextPassage,
 };

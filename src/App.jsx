@@ -1,5 +1,7 @@
 import { Suspense, lazy, useState, useEffect } from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import { AppStateProvider, useAppState } from '@/services/appState.jsx';
+import { useRouteSync } from '@/services/useRouteSync';
 import UIRouter from '@/components/UIRouter';
 
 // Lazy load Canvas to avoid circular dependency issues
@@ -25,10 +27,14 @@ function isWebGLAvailable() {
 /**
  * AppContent: Inner component with access to app state
  * Conditionally renders canvas based on current phase and WebGL support
+ * Synchronizes URL with app state machine
  */
 function AppContent() {
   const { state } = useAppState();
   const [webglSupported, setWebglSupported] = useState(true);
+  
+  // Sync URL with app state bidirectionally
+  useRouteSync();
   
   useEffect(() => {
     setWebglSupported(isWebGLAvailable());
@@ -66,21 +72,25 @@ function AppContent() {
  * App: Root component for StoryTeller
  * 
  * Architecture:
+ * - BrowserRouter: Enables URL-based navigation with browser history
  * - AppStateProvider: Wraps entire app with global state context
  * - Canvas layer: Three.js 3D scene (absolute z-0, pointer-events: none)
  *   - Hidden during PLAYING phase for full-screen story reading
- * - UIRouter: Phase-based UI overlay (absolute z-10+, interactive)
+ * - UIRouter: Route-based UI overlay (absolute z-10+, interactive)
  * 
  * Canvas and UI operate independently:
  * - Canvas renders continuously if visible
  * - UI dispatches state changes that trigger canvas animations
  * - No direct communication between layers (state machine is bridge)
  * - Canvas unmounts during PLAYING phase to free resources
+ * - Routes sync with state machine for seamless transitions
  */
 export default function App() {
   return (
-    <AppStateProvider>
-      <AppContent />
-    </AppStateProvider>
+    <BrowserRouter>
+      <AppStateProvider>
+        <AppContent />
+      </AppStateProvider>
+    </BrowserRouter>
   );
 }
