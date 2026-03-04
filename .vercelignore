@@ -1,0 +1,16 @@
+# Exclude old individual API handlers - only server.js should be deployed
+api/health.js
+api/auth/github.js
+api/auth/callback.js
+api/auth/logout.js
+api/auth/me.js
+api/stories/create.js
+api/stories/mine.js
+api/stories/explore.js
+api/stories/by-slug.js
+api/stories/fork.js
+api/stories/update-story.js
+api/stories/delete-story.js
+
+# Keep dev server for local development only
+api/dev-server.js

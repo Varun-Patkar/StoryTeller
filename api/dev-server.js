@@ -1,26 +1,14 @@
 /**
- * Local development server for StoryTeller Node API handlers.
+ * Local development server for StoryTeller Node API.
  *
- * Routes requests to handler functions without Vercel infrastructure.
+ * Runs the Express app on a local port.
  * Usage: node api/dev-server.js
  */
 
-import http from "http";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
-import healthHandler from "./health.js";
-import exploreHandler from "./stories/explore.js";
-import mineHandler from "./stories/mine.js";
-import createHandler from "./stories/create.js";
-import bySlugHandler from "./stories/by-slug.js";
-import forkHandler from "./stories/fork.js";
-import updateStoryHandler from "./stories/update-story.js";
-import deleteStoryHandler from "./stories/delete-story.js";
-import githubHandler from "./auth/github.js";
-import meHandler from "./auth/me.js";
-import callbackHandler from "./auth/callback.js";
-import logoutHandler from "./auth/logout.js";
+import app from "./server.js";
 
 /**
  * Load environment variables from the project .env file for local development.
@@ -51,10 +39,11 @@ function loadLocalEnvFile() {
       continue;
     }
 
-    const key = line.slice(0, separatorIndex).trim();
-    const value = line.slice(separatorIndex + 1).trim();
+    const key = line.substring(0, separatorIndex).trim();
+    const value = line.substring(separatorIndex + 1).trim();
 
-    if (!(key in process.env)) {
+    // Only set if not already in process.env
+    if (process.env[key] === undefined) {
       process.env[key] = value;
     }
   }
@@ -62,83 +51,10 @@ function loadLocalEnvFile() {
 
 loadLocalEnvFile();
 
-const PORT = process.env.API_PORT || 8000;
+const port = process.env.PORT || 3001;
 
-// Route handlers map (exact paths only)
-const routes = {
-  "/api/health": { GET: healthHandler },
-  "/api/stories/explore": { GET: exploreHandler },
-  "/api/stories/mine": { GET: mineHandler },
-  "/api/stories/create": { POST: createHandler },
-  "/api/stories/by-slug": { GET: bySlugHandler },
-  "/api/stories/fork": { POST: forkHandler },
-  "/api/auth/github": { POST: githubHandler },
-  "/api/auth/me": { GET: meHandler },
-  "/api/auth/callback": { GET: callbackHandler },
-  "/api/auth/logout": { POST: logoutHandler },
-};
-
-/**
- * Handle dynamic routes like /api/stories/:id (PUT, DELETE)
- * 
- * @param {string} urlPath - Request path
- * @param {string} method - HTTP method
- * @returns {function|null} Handler function or null if no match
- */
-function getDynamicRouteHandler(urlPath, method) {
-  // Pattern: /api/stories/:id with PUT or DELETE
-  const storyIdMatch = urlPath.match(/^\/api\/stories\/([^/]+)$/);
-  if (storyIdMatch) {
-    if (method === "PUT") {
-      return updateStoryHandler;
-    }
-    if (method === "DELETE") {
-      return deleteStoryHandler;
-    }
-  }
-  
-  return null;
-}
-
-/**
- * Create and start the development HTTP server.
- */
-const server = http.createServer(async (req, res) => {
-  // Parse URL path (remove query string)
-  const urlPath = req.url.split("?")[0];
-
-  // Try exact path routes first
-  let handler = null;
-  const route = routes[urlPath];
-  
-  if (route) {
-    // Found exact match - get handler for method
-    handler = route[req.method] || (req.method === "OPTIONS" ? Object.values(route)[0] : null);
-  } else {
-    // Try dynamic routes (e.g., /api/stories/:id)
-    handler = getDynamicRouteHandler(urlPath, req.method) ||
-              (req.method === "OPTIONS" ? getDynamicRouteHandler(urlPath, "GET") : null);
-  }
-  
-  if (!handler) {
-    res.statusCode = 404;
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ error: "Not Found" }));
-    return;
-  }
-
-  try {
-    await handler(req, res);
-  } catch (error) {
-    console.error(`Error handling ${req.method} ${urlPath}:`, error);
-    res.statusCode = 500;
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ error: "Internal Server Error" }));
-  }
-});
-
-server.listen(PORT, () => {
-  console.log(`✓ StoryTeller API running at http://localhost:${PORT}`);
-  console.log(`  Health: http://localhost:${PORT}/api/health`);
-  console.log(`  Stories: http://localhost:${PORT}/api/stories/explore`);
+const server = app.listen(port, () => {
+  console.log(`\n🚀 StoryTeller API running at http://localhost:${port}`);
+  console.log(`   Health check: http://localhost:${port}/api/health`);
+  console.log(`\nPress Ctrl+C to stop\n`);
 });
