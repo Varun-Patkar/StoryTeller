@@ -7,7 +7,7 @@
 
 ## Project Overview
 
-**StoryTeller** is a cinematic 3D web application for creating AI-powered interactive text adventures. The MVP focuses entirely on frontend UI/UX with mocked backend integration.
+**StoryTeller** is a cinematic 3D web application for creating AI-powered interactive text adventures. The frontend remains Vite + React + 3D Canvas, while a Vercel `/api` backend handles MongoDB persistence and GitHub OAuth.
 
 **Core Experience**:
 1. Mystical boot sequence checks backend service connection
@@ -42,6 +42,12 @@
 ### State Management
 - **React Context + useReducer**: Global app phase state machine
 - **Custom Hooks**: Encapsulate logic (usePhaseTransition, useCameraAnimation)
+
+### Backend (Vercel /api)
+- **Runtime**: Vercel Serverless Functions (Python)
+- **Database**: MongoDB for persistence
+- **Auth**: GitHub OAuth
+- **LLM**: Ollama accessed directly from the React frontend (`http://localhost:11434`)
 
 ---
 
@@ -307,7 +313,7 @@ useGLTF.preload('/earth-like/source/Untitled.glb');
 
 ## Mock API Contract
 
-All backend calls simulated in `src/services/mockApi.js`:
+All backend calls simulated in `src/services/mockApi.js` until `/api` endpoints replace them:
 
 ### Available Functions
 
@@ -385,7 +391,7 @@ MVP does not include tests per constitution (no test-first principle), but when 
 
 MVP is local development only. Future deployment:
 
-- **Static Host**: Vercel, Netlify, Cloudflare Pages
+- **Host**: Vercel (frontend + `/api` serverless)
 - **Build Command**: `npm run build`
 - **Output Directory**: `dist/`
 - **Environment Variables**: `VITE_API_URL` for real backend

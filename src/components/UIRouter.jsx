@@ -28,6 +28,7 @@ import NotFound from '@/components/ui/NotFound';
 // Lazy load heavy components to reduce initial bundle size
 const StorySetup = lazy(() => import('@/components/ui/StorySetup'));
 const StoryReader = lazy(() => import('@/components/ui/StoryReader'));
+const OAuthCallback = lazy(() => import('@/routes/OAuthCallback'));
 
 /**
  * RootRoute: Handles both boot sequence and model selection at root URL
@@ -64,14 +65,28 @@ function RootRoute() {
  * @param {Object} props
  * @param {React.Component} props.component - Component to render if authorized
  * @param {Array<string>} props.requires - Array of prerequisite checks
+ * @param {boolean} [props.allowWhileChecking=false] - Allow loading while connection is checking
  * @returns {JSX.Element} Protected component or redirect
  */
-function ProtectedRoute({ component: Component, requires = [] }) {
+function ProtectedRoute({ component: Component, requires = [], allowWhileChecking = false }) {
   const { state } = useAppState();
   
   // Check connection requirement
-  if (requires.includes('connectionOnline') && state.connectionStatus !== 'ONLINE') {
-    return <Navigate to="/" replace />;
+  if (requires.includes('connectionOnline')) {
+    // If connection is still checking and route doesn't allow it, show loading
+    if (state.connectionStatus === 'CHECKING') {
+      if (allowWhileChecking) {
+        // Allow component to render (it will handle loading state)
+        return <Component />;
+      }
+      // Wait for connection check to complete
+      return null;
+    }
+    
+    // Connection check completed but not online - redirect
+    if (state.connectionStatus !== 'ONLINE') {
+      return <Navigate to="/" replace />;
+    }
   }
   
   // Check model selection requirement
@@ -122,6 +137,9 @@ export default function UIRouter() {
           {/* Root: Boot sequence + Model selector (phase-based) */}
           <Route path="/" element={<RootRoute />} />
           
+          {/* OAuth callback: No protection needed */}
+          <Route path="/auth/callback" element={<OAuthCallback />} />
+          
           {/* Dashboard: Requires connection and model */}
           <Route 
             path="/dashboard" 
@@ -144,13 +162,14 @@ export default function UIRouter() {
             } 
           />
           
-          {/* Story reader: Requires connection and model (story validated internally) */}
+          {/* Story reader: Requires connection only (model optional for viewing, required for responses) */}
           <Route 
             path="/story/:slug" 
             element={
               <ProtectedRoute 
                 component={StoryReader} 
-                requires={['connectionOnline', 'modelSelected']} 
+                requires={['connectionOnline']}
+                allowWhileChecking={true}
               />
             } 
           />

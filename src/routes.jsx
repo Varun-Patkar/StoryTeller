@@ -22,6 +22,7 @@ const ModelSelector = lazy(() => import('./components/ui/ModelSelector'));
 const Dashboard = lazy(() => import('./components/ui/Dashboard'));
 const StorySetup = lazy(() => import('./components/ui/StorySetup'));
 const StoryReader = lazy(() => import('./components/ui/StoryReader'));
+const OAuthCallback = lazy(() => import('./routes/OAuthCallback'));
 
 /**
  * Route configuration array
@@ -47,6 +48,13 @@ export const routes = [
     phase: 'DASHBOARD',
     protected: true,
     requires: ['connectionOnline', 'modelSelected'], // Requires connection + model
+  },
+  {
+    path: '/auth/callback',
+    component: OAuthCallback,
+    phase: null, // No phase - callback only
+    protected: false,
+    requires: [],
   },
   {
     path: '/new',

@@ -1,7 +1,7 @@
 import { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { AppStateProvider, useAppState } from '@/services/appState.jsx';
-import { getAvailableModels } from '@/services/mockApi';
+import { getAvailableModels, checkOllamaConnection } from '@/services/mockApi';
 import { useRouteSync } from '@/services/useRouteSync';
 import { useDocumentTitle } from '@/utils/seo';
 import UIRouter from '@/components/UIRouter';
@@ -44,6 +44,60 @@ function AppContent() {
   useEffect(() => {
     setWebglSupported(isWebGLAvailable());
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    /**
+     * Check Ollama connection on app load.
+     * This ensures connection status is known regardless of entry route.
+     *
+     * @returns {Promise<void>}
+     */
+    async function checkConnection() {
+      dispatch({ type: 'CONNECTION_CHECK_START' });
+
+      try {
+        const result = await checkOllamaConnection();
+        if (!isMounted) return;
+
+        if (result.status === 'online') {
+          dispatch({ type: 'CONNECTION_CHECK_SUCCESS' });
+        } else if (result.status === 'cors_error') {
+          dispatch({
+            type: 'CONNECTION_CHECK_CORS_ERROR',
+            payload: {
+              message: 'Browser blocked access to Ollama. See instructions below.',
+              corsFix: 'OLLAMA_ORIGINS="http://localhost:5173" ollama serve',
+            },
+          });
+        } else {
+          dispatch({
+            type: 'CONNECTION_CHECK_FAILURE',
+            payload: {
+              message: 'Ollama is not awakened yet. Call it forth to begin.',
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Connection check failed:', error);
+        if (isMounted) {
+          dispatch({
+            type: 'CONNECTION_CHECK_FAILURE',
+            payload: {
+              message: 'Failed to reach Ollama. Ensure it is running.',
+            },
+          });
+        }
+      }
+    }
+
+    checkConnection();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     let isMounted = true;

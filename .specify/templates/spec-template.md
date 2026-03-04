@@ -82,6 +82,13 @@
   Fill them out with the right functional requirements.
 -->
 
+<!--
+  Constitution reminders:
+  - Preserve existing frontend; extend instead of rewriting
+  - Frontend handles LLM calls via localhost; /api is MongoDB + GitHub OAuth only
+  - No secrets in frontend code or responses
+-->
+
 ### Functional Requirements
 
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]

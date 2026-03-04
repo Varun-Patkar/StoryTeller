@@ -23,11 +23,10 @@ export default function TextArea({
 }) {
   const { current, max, remaining, percentage } = getCharacterCount(value, maxLength);
 
-  // Color intensity increases as character limit is approached
+  // Keep counter green unless the limit is exceeded
   const getProgressColor = () => {
-    if (percentage < 60) return 'text-green-400';
-    if (percentage < 85) return 'text-red-400';
-    return 'text-red-400';
+    if (current > max) return 'text-red-400';
+    return 'text-green-400';
   };
 
   return (
@@ -43,8 +42,8 @@ export default function TextArea({
           w-full px-4 py-2 rounded
           bg-gray-800 text-gray-100
           border-2 border-blue-700
-          hover:border-red-500
-          focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500 focus:ring-opacity-50
+          hover:border-blue-400
+          focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400 focus:ring-opacity-50
           resize-none
           transition-colors duration-200
           placeholder-gray-500

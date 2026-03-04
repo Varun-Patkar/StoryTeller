@@ -26,6 +26,8 @@ const initialState = {
   storySetup: null,
   currentStoryId: null,
   userStories: [],
+  user: null,
+  isUserHydrated: false,
   error: null,
   timestamp: new Date().toISOString(),
 };
@@ -81,6 +83,25 @@ function appStateReducer(state, action) {
           message:
             action.payload?.message ||
             'Ollama is not awakened yet. Call it forth to begin.',
+          phase: state.phase,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+    case 'CONNECTION_CHECK_CORS_ERROR':
+      /**
+       * CORS Error: Ollama is running but browser policy blocks access.
+       * Typically solved by starting Ollama with OLLAMA_ORIGINS env var.
+       */
+      return {
+        ...state,
+        connectionStatus: 'CORS_ERROR',
+        error: {
+          code: 'CORS_ERROR',
+          message:
+            action.payload?.message ||
+            'Browser blocked access to Ollama. See instructions below.',
+          corsFix: action.payload?.corsFix,
           phase: state.phase,
           timestamp: new Date().toISOString(),
         },
@@ -264,6 +285,37 @@ function appStateReducer(state, action) {
         error: null,
       };
 
+    // ============ User Authentication ============
+
+    case 'USER_HYDRATE_START':
+      return {
+        ...state,
+        isUserHydrated: false,
+      };
+
+    case 'USER_HYDRATE_COMPLETE':
+      return {
+        ...state,
+        user: action.payload?.user || null,
+        isUserHydrated: true,
+        error: null,
+      };
+
+    case 'USER_LOGIN':
+      return {
+        ...state,
+        user: action.payload.user,
+        error: null,
+      };
+
+    case 'USER_LOGOUT':
+      return {
+        ...state,
+        user: null,
+        userStories: [],
+        error: null,
+      };
+
     // ============ URL Synchronization ============
 
     case 'SYNC_PHASE_FROM_URL':
@@ -293,9 +345,51 @@ function appStateReducer(state, action) {
  * 
  * Wraps application with React Context for global state access
  * Provides state and dispatch to all child components
+ * Hydrates user from /api/auth/me on mount
  */
 export function AppStateProvider({ children }) {
   const [state, dispatch] = useReducer(appStateReducer, initialState);
+
+  React.useEffect(() => {
+    /**
+     * Hydrate authenticated user from /api/auth/me on app load.
+     * Sets isUserHydrated=true regardless of auth status.
+     * This ensures dashboard knows whether to show auth prompt.
+     */
+    async function hydrateUser() {
+      dispatch({ type: 'USER_HYDRATE_START' });
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include', // Include session cookie
+        });
+        
+        // Handle non-OK responses
+        if (!response.ok) {
+          console.warn('Auth check returned:', response.status);
+          dispatch({
+            type: 'USER_HYDRATE_COMPLETE',
+            payload: { user: null },
+          });
+          return;
+        }
+
+        const data = await response.json();
+        dispatch({
+          type: 'USER_HYDRATE_COMPLETE',
+          payload: data,
+        });
+      } catch (error) {
+        console.error('User hydration failed:', error);
+        // Hydration complete but user is null (logged out)
+        dispatch({
+          type: 'USER_HYDRATE_COMPLETE',
+          payload: { user: null },
+        });
+      }
+    }
+
+    hydrateUser();
+  }, []);
 
   return (
     <AppStateContext.Provider value={{ state, dispatch }}>

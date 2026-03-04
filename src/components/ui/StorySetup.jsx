@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '@/services/appState.jsx';
-import { validateStorySetup } from '@/utils/validation';
-import { createStory } from '@/services/mockApi';
+import { validateStorySetup, validateTitle, validateVisibility } from '@/utils/validation';
+import { createStory, generatePrologue } from '@/services/mockApi';
+import { ApiError, apiGet } from '@/services/apiClient';
 import Button from '@/components/common/Button';
 import Dropdown from '@/components/common/Dropdown';
 import TextArea from '@/components/common/TextArea';
 
 /**
- * StorySetup: Story creation form for defining character, premise, and goals.
+ * StorySetup: Story creation form for defining book name, visibility, character, premise, and goals.
  *
  * Layout:
  * - Right-side panel occupying 50vw
  * - Logo at top
- * - Form fields: Fandom dropdown, Character, Premise, Goals text areas
+ * - Form fields: Book Title, Visibility toggle, Fandom dropdown, Character, Premise, Goals text areas
  * - Validation with mystical error messages
  * - "Begin Story" button to submit and transition to reading phase
  *
@@ -23,6 +24,8 @@ export default function StorySetup() {
   const { state, dispatch } = useAppState();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
+    title: '',
+    visibility: 'public',
     fandom: '',
     character: '',
     premise: '',
@@ -31,6 +34,7 @@ export default function StorySetup() {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [prologueLoading, setPrologueLoading] = useState(false);
 
   // Available fandoms for the dropdown
   const fandomOptions = [
@@ -86,13 +90,53 @@ export default function StorySetup() {
       return;
     }
 
+    try {
+      const authResponse = await apiGet('/auth/me');
+      const currentUser = authResponse?.user || null;
+
+      if (!currentUser) {
+        setErrors({
+          submit: 'Sign in with GitHub to create and save stories. Return to Dashboard to continue.',
+        });
+        return;
+      }
+    } catch (authError) {
+      if (authError instanceof ApiError && authError.status === 401) {
+        setErrors({
+          submit: 'You must sign in with GitHub before creating a story.',
+        });
+        return;
+      }
+
+      setErrors({
+        submit: 'Unable to verify your session right now. Please try again.',
+      });
+      return;
+    }
+
     // Mark all fields as touched
     setTouched({
+      title: true,
+      visibility: true,
       fandom: true,
       character: true,
       premise: true,
       goals: true,
     });
+
+    // Validate title
+    const titleValidation = validateTitle(formData.title);
+    if (!titleValidation.valid) {
+      setErrors(prev => ({ ...prev, title: titleValidation.message }));
+      return;
+    }
+
+    // Validate visibility
+    const visibilityValidation = validateVisibility(formData.visibility);
+    if (!visibilityValidation.valid) {
+      setErrors(prev => ({ ...prev, visibility: visibilityValidation.message }));
+      return;
+    }
 
     // Validate entire form
     const validation = validateStorySetup(formData);
@@ -112,23 +156,51 @@ export default function StorySetup() {
       return;
     }
 
-    // All validation passed - create story
+    // All validation passed - generate prologue then create story
     try {
       setIsSubmitting(true);
       setErrors({});
+      setPrologueLoading(true);
 
-      // Prepare story setup payload
-      const setupPayload = {
+      // Prepare setup context for prologue generation
+      const setupContext = {
         fandom: fandomOptions.find(opt => opt.value === formData.fandom)?.label || formData.fandom,
         character: formData.character,
         premise: formData.premise,
         goals: formData.goals,
-        model: state.selectedModel?.ollamaTag || 'llama3:8b',
       };
 
-      console.log('Creating story with payload:', setupPayload);
+      console.log('Generating prologue with context:', setupContext);
 
-      // Call mock API to generate story
+      // Generate prologue via Ollama silently in background
+      const prologue = await generatePrologue(
+        state.selectedModel?.ollamaTag || 'llama3.1:8b',
+        setupContext,
+        () => {} // Silent generation - no UI update
+      );
+
+      console.log('Prologue generated:', prologue.substring(0, 100) + '...');
+      setPrologueLoading(false);
+
+      // Now create story with generated prologue
+      const setupPayload = {
+        title: formData.title,
+        visibility: formData.visibility,
+        setup_context: {
+          model_id: state.selectedModel?.ollamaTag || 'llama3.1:8b',
+          fandom: setupContext.fandom,
+          character: setupContext.character,
+          premise: setupContext.premise,
+          goals: setupContext.goals,
+        },
+        initial_passage: {
+          content: prologue,
+        },
+      };
+
+      console.log('Creating story with generated prologue...');
+
+      // Call API to persist story with prologue to database
       const story = await createStory(setupPayload);
 
       console.log('Story created:', story);
@@ -140,8 +212,9 @@ export default function StorySetup() {
     } catch (error) {
       console.error('Story creation failed:', error);
       setErrors({
-        submit: 'The tapestry resists weaving. Try once more.',
+        submit: error.message || 'The tapestry resists weaving. Try once more.',
       });
+      setPrologueLoading(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -211,6 +284,59 @@ export default function StorySetup() {
         {/* Form fields */}
         <div className="flex-1 space-y-6 animate-[fadeUp_0.7s_ease-out]">
           
+          {/* Book Title input */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-100 mb-2">
+              📖 Book Title
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => handleChange('title', e.target.value)}
+              onBlur={() => handleBlur('title')}
+              placeholder="Name your literary creation..."
+              maxLength={80}
+              className="w-full bg-black/40 border border-blue-500/30 rounded px-4 py-2 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-400 transition"
+              disabled={isSubmitting}
+            />
+            {touched.title && errors.title && (
+              <p className="text-red-400 text-xs mt-1">{errors.title}</p>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              {formData.title.length}/80 characters
+            </p>
+          </div>
+
+          {/* Visibility toggle */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-100 mb-2">
+              👁️ Story Visibility
+            </label>
+            <div className="flex gap-3">
+              {[
+                { value: 'public', label: '🌍 Public', description: 'Others can discover & fork' },
+                { value: 'private', label: '🔒 Private', description: 'Only you can access' }
+              ].map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => handleChange('visibility', option.value)}
+                  className={`flex-1 p-3 rounded border-2 transition ${
+                    formData.visibility === option.value
+                      ? 'border-blue-400 bg-blue-900/20 text-blue-100'
+                      : 'border-blue-500/30 bg-black/40 text-gray-300 hover:border-blue-400'
+                  } disabled:opacity-50`}
+                  disabled={isSubmitting}
+                >
+                  <div className="font-semibold">{option.label}</div>
+                  <div className="text-xs text-gray-400">{option.description}</div>
+                </button>
+              ))}
+            </div>
+            {touched.visibility && errors.visibility && (
+              <p className="text-red-400 text-xs mt-1">{errors.visibility}</p>
+            )}
+          </div>
+
           {/* Fandom dropdown */}
           <div>
             <label className="block text-sm font-semibold text-gray-100 mb-2">
@@ -276,14 +402,16 @@ export default function StorySetup() {
             )}
           </div>
 
+          {/* Prologue generation happens silently in background */}
+
           {/* Submit button */}
           <div className="pt-4">
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || state.isTransitioning}
+              disabled={isSubmitting || state.isTransitioning || prologueLoading}
               className="w-full"
             >
-              {isSubmitting ? 'Weaving the tale...' : 'Begin Story'}
+              {prologueLoading ? '✨ Weaving your tale...' : 'Begin Story'}
             </Button>
             {errors.submit && (
               <p className="text-red-400 text-sm mt-3 text-center">{errors.submit}</p>

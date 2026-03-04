@@ -14,7 +14,8 @@ StoryTeller is a web application that combines AI-driven narrative generation wi
 - **Mystical Interface**: Blue/red color scheme with elegant typography
 
 ### 🤖 AI Integration
-- **Ollama Model Selection**: Choose from available AI models (llama3:8b, mistral:7b)
+- **Ollama Model Selection**: Uses llama3.1:8b for AI generation
+- **Frontend LLM Calls**: React frontend talks directly to `http://localhost:11434` (BYOE)
 - **Model Persistence**: Selected model is stored in localStorage and validated on startup
 - **Story Generation**: AI-powered prologue creation based on your character, premise, and goals
 - **Multiple Fandoms**: Create stories in various universes (Douluo Dalu, Naruto, One Piece, etc.)
@@ -40,6 +41,9 @@ StoryTeller is a web application that combines AI-driven narrative generation wi
 - **@react-three/drei**: Helper components for Three.js
 - **GSAP**: Professional-grade animations
 - **Tailwind CSS**: Utility-first styling
+- **Vercel Serverless Functions**: Python `/api` for MongoDB + GitHub OAuth only
+- **MongoDB**: Story persistence
+- **GitHub OAuth**: User authentication
 
 ---
 
@@ -133,6 +137,7 @@ StoryTeller/
 │   ├── App.jsx             # Root component
 │   └── main.jsx            # Entry point
 ├── specs/                  # Specification documents
+├── api/                    # Vercel serverless Python functions
 └── AGENTS.md              # AI agent context
 ```
 
@@ -231,7 +236,9 @@ Custom colors defined in `tailwind.config.js`:
 
 ### Environment Variables
 
-No environment variables required for MVP. Future integration with real backend will use:
+No environment variables required for the frontend MVP. Backend secrets (MongoDB URI, OAuth client/secret) MUST live in backend environment variables only.
+
+Future integration with real backend may use:
 - `VITE_API_URL`: Backend API endpoint
 
 ---
@@ -270,7 +277,7 @@ export default function ComponentName({ prop1, prop2 }) {
 
 ## Mock API
 
-Current implementation uses mocked backend responses:
+Current implementation uses mocked backend responses (to be replaced by `/api` endpoints):
 
 - `checkOllamaConnection()`: Simulates connection check (80% success rate)
 - `getAvailableModels()`: Returns hardcoded model list

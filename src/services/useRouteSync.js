@@ -43,6 +43,17 @@ export function useRouteSync() {
   };
 
   /**
+   * Valid phase transitions (must match appState rules)
+   */
+  const validTransitions = {
+    CHECKING_ENGINE: ['SELECTING_SOURCE'],
+    SELECTING_SOURCE: ['DASHBOARD'],
+    DASHBOARD: ['SETUP', 'PLAYING'],
+    SETUP: ['PLAYING', 'DASHBOARD'],
+    PLAYING: ['DASHBOARD', 'SETUP'],
+  };
+
+  /**
    * Sync URL changes to phase state with animations
    * Triggered when user navigates via browser (back/forward/manual URL entry)
    */
@@ -53,17 +64,32 @@ export function useRouteSync() {
     if (!state.isModelHydrated) {
       return;
     }
+
+    // Wait for connection check to complete for dashboard/setup routes
+    if (state.connectionStatus === 'CHECKING' && (currentPath === '/dashboard' || currentPath === '/new')) {
+      return;
+    }
     
     // Handle story URLs separately (dynamic slug)
     if (currentPath.startsWith('/story/')) {
       if (state.phase !== 'PLAYING' && !state.isTransitioning) {
-        dispatch({ type: 'TRANSITION_TO_PLAYING' });
+        const canAnimate = validTransitions[state.phase]?.includes('PLAYING');
+        if (!canAnimate) {
+          dispatch({ type: 'SYNC_PHASE_FROM_URL', payload: { phase: 'PLAYING' } });
+        } else {
+          dispatch({ type: 'TRANSITION_TO_PLAYING' });
+        }
       }
       return;
     }
 
-    // Smart "/" handling: avoid invalid transitions back to CHECKING_ENGINE
+    // Smart "/" handling: avoid invalid transitions
     if (currentPath === '/') {
+      // Don't transition back to CHECKING_ENGINE if user is already authenticated at DASHBOARD
+      if (state.user !== null && state.phase === 'DASHBOARD') {
+        return; // Already at proper phase
+      }
+      
       if (state.connectionStatus === 'ONLINE') {
         // If redirected to model selection due to missing model, skip animation
         if (!state.selectedModel && state.phase !== 'SELECTING_SOURCE') {
@@ -85,6 +111,26 @@ export function useRouteSync() {
     const targetPhase = pathToPhase[currentPath];
     
     if (targetPhase && targetPhase !== state.phase && !state.isTransitioning) {
+      // For initial page load, check if we're coming from CHECKING_ENGINE
+      // If so, transition through SELECTING_SOURCE first to enable animation
+      if (state.phase === 'CHECKING_ENGINE' && targetPhase === 'DASHBOARD' && state.connectionStatus === 'ONLINE' && state.selectedModel) {
+        // First transition to SELECTING_SOURCE
+        dispatch({ type: 'TRANSITION_COMPLETE', payload: { targetPhase: 'SELECTING_SOURCE' } });
+        // Then immediately transition to DASHBOARD (will be picked up on next render)
+        setTimeout(() => {
+          dispatch({ type: 'TRANSITION_TO_DASHBOARD' });
+        }, 0);
+        return;
+      }
+
+      const canAnimate = validTransitions[state.phase]?.includes(targetPhase);
+
+      // Invalid phase transitions should sync instantly to avoid dead states.
+      if (!canAnimate) {
+        dispatch({ type: 'SYNC_PHASE_FROM_URL', payload: { phase: targetPhase } });
+        return;
+      }
+
       // URL changed, trigger transition with animation
       const transitionAction = phaseToTransition[targetPhase];
       if (transitionAction) {

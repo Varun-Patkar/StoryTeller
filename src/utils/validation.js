@@ -155,6 +155,71 @@ export function validateStorySetup(setup) {
 }
 
 /**
+ * Validate story title (Book Name) field
+ * 
+ * Title must be 3-80 characters (meaningful but concise).
+ * 
+ * @param {string} text - Story title text
+ * @returns {Object} { valid: boolean, message: string }
+ */
+export function validateTitle(text) {
+  if (!text || text.trim().length === 0) {
+    return {
+      valid: false,
+      message: 'Every story deserves a name...',
+    };
+  }
+
+  if (text.length < 3) {
+    return {
+      valid: false,
+      message: 'A title requires at least 3 characters.',
+    };
+  }
+
+  if (text.length > 80) {
+    return {
+      valid: false,
+      message: 'Keep the title concise—under 80 characters.',
+    };
+  }
+
+  return {
+    valid: true,
+    message: 'Title accepted.',
+  };
+}
+
+/**
+ * Validate story visibility setting
+ * 
+ * Visibility must be either 'public' or 'private'.
+ * 
+ * @param {string} visibility - Visibility mode ('public' or 'private')
+ * @returns {Object} { valid: boolean, message: string }
+ */
+export function validateVisibility(visibility) {
+  if (!visibility) {
+    return {
+      valid: false,
+      message: 'Choose whether your story is shared or kept private.',
+    };
+  }
+
+  if (!['public', 'private'].includes(visibility)) {
+    return {
+      valid: false,
+      message: 'Visibility must be public or private.',
+    };
+  }
+
+  return {
+    valid: true,
+    message: 'Visibility set.',
+  };
+}
+
+/**
  * Utility: Get character count with max limit
  * For use in TextArea component character counters
  * 
@@ -179,6 +244,8 @@ export default {
   validateCharacter,
   validatePremise,
   validateGoals,
+  validateTitle,
+  validateVisibility,
   validateStorySetup,
   getCharacterCount,
 };

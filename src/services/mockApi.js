@@ -1,16 +1,23 @@
 /**
  * Mock API Service
  * 
- * Provides simulated backend API calls for the MVP phase.
- * All functions return Promises with realistic network delays (800-1500ms).
- * These interfaces will be replaced with real fetch() calls in production.
+ * PHASE 3 UPDATE: Functions that interact with BYOE Ollama have been
+ * replaced with real calls to ollamaClient.
  * 
- * Mock behavior can be overridden via environment variables:
- * - VITE_MOCK_OLLAMA_STATUS=online|offline (forces connection status)
- * - MOCK_API_DELAY=number (custom delay in ms)
+ * PHASE 4 UPDATE: Story persistence functions now use real API calls
+ * instead of mocking.
+ * 
+ * Real functions:
+ * - checkOllamaConnection() → ollamaPing()
+ * - getAvailableModels() → ollamaGetModels()
+ * - getUserStories() → GET /api/stories/mine
+ * - createStory() → POST /api/stories/create
  */
 
+import { apiGet, apiPost, apiPut, apiDelete } from '@/services/apiClient';
 import { generateUniqueSlug, isValidSlug } from '@/utils/slugify';
+import { ollamaPing, ollamaGetModels, generateStoryPrologue, generateStoryPassage } from '@/services/ollamaClient';
+import { getMysticalLoadingMessage } from '@/utils/ollamaPrompts';
 
 /**
  * Default simulated network delay (ms)
@@ -26,6 +33,42 @@ const DEFAULT_DELAY = 1000;
  */
 const storyStore = new Map();
 const slugToIdMap = new Map();
+
+/**
+ * Normalize a story API response into the StoryReader format.
+ *
+ * @param {Object} story - Story payload from API.
+ * @returns {Object} Normalized story for StoryReader.
+ */
+function normalizeStoryFromApi(story) {
+  const passages = Array.isArray(story.passages) ? story.passages : [];
+  const normalizedPassages = passages.map((passage, index) => ({
+    id: passage.id || `${story.id || 'story'}-${index}`,
+    text: passage.text || passage.content || '',
+    content: passage.content || passage.text || '', // Keep both for compatibility
+    displayedAt: passage.displayedAt || passage.created_at || story.created_at,
+  }));
+
+  const wordCount = Number(story.wordCount || story.word_count || 0) || normalizedPassages.reduce((sum, passage) => {
+    return sum + (passage.text?.split(/\s+/).length || 0);
+  }, 0);
+
+  return {
+    id: story.id,
+    slug: story.slug,
+    title: story.title,
+    author_id: story.author_id,
+    visibility: story.visibility,
+    fandom: story.fandom || story.setup_context?.fandom || 'Unknown',
+    setup_context: story.setup_context || null,
+    prologue: story.prologue || normalizedPassages[0]?.text || '',
+    createdAt: story.created_at,
+    lastModified: story.updated_at || story.lastModified || story.created_at,
+    passages: normalizedPassages,
+    currentPassageIndex: Math.max(0, normalizedPassages.length - 1),
+    wordCount,
+  };
+}
 
 /**
  * Helper: Add realistic network delay
@@ -76,171 +119,272 @@ function generateLoremIpsum(minParagraphs = 4, maxParagraphs = 6) {
 // ============ API Functions ============
 
 /**
- * checkOllamaConnection: Check backend service status
- * 
- * Simulates connection check to Ollama backend (mocked).
- * Returns online 80% of the time for realistic testing.
- * 
- * @returns {Promise<{status: string, timestamp: string, message?: string}>}
+ * checkOllamaConnection: Check if Ollama is running and accessible.
+ *
+ * PHASE 3: Replaced mock implementation with real ollamaPing() call.
+ * Now actually tests connection to localhost:11434 and detects CORS errors.
+ *
+ * Returns:
+ * - { status: "online" }: Ollama is running and accessible
+ * - { status: "offline" }: Ollama not responding (not running, wrong port, etc)
+ * - { status: "cors_error" }: CORS policy blocks access (show remediation in BootSequence)
+ *
+ * @returns {Promise<{status: string, timestamp: string}>}
+ *
+ * @example
+ *   const result = await checkOllamaConnection();
+ *   if (result.status === "online") {
+ *     // Proceed to model selection
+ *   } else if (result.status === "cors_error") {
+ *     // Show CORS fix instructions in BootSequence
+ *   } else {
+ *     // Show "start Ollama" instructions
+ *   }
  */
 export async function checkOllamaConnection() {
-  await delay(randomDelay(1000, 1500));
-
-  // Check override via env var
-  const envStatus = import.meta.env.VITE_MOCK_OLLAMA_STATUS;
-  if (envStatus === 'online' || envStatus === 'offline') {
-    return {
-      status: envStatus,
-      timestamp: new Date().toISOString(),
-      message:
-        envStatus === 'online'
-          ? 'The gateway awakens...'
-          : 'The gateway sleeps. Awaken it to begin your journey.',
-    };
-  }
-
-  // 80% online, 20% offline
-  const isOnline = Math.random() < 0.8;
-
+  // Call real Ollama health check instead of mock
+  const result = await ollamaPing();
+  
   return {
-    status: isOnline ? 'online' : 'offline',
-    timestamp: new Date().toISOString(),
-    message: isOnline
-      ? 'The gateway awakens...'
-      : 'The gateway sleeps. Awaken it to begin your journey.',
+    status: result.status, // "online" | "offline" | "cors_error"
+    timestamp: result.timestamp,
+    // Include error message if available for debugging
+    ...(result.error && { error: result.error })
   };
 }
 
 /**
- * getAvailableModels: Fetch list of AI models
- * 
- * Returns hardcoded list of available language models.
- * Future: Load from configuration file or real backend.
- * 
- * @returns {Promise<Array>} Array of AIModel objects
+ * getAvailableModels: Fetch list of AI models from Ollama.
+ *
+ * PHASE 3: Replaced mock implementation with real ollamaGetModels() call.
+ * Now actually queries localhost:11434/api/tags for installed models.
+ *
+ * If a custom model is not listed but was previously selected, it's still available
+ * (user may have a model loaded but not yet pulled in the current Ollama session).
+ *
+ * @returns {Promise<Array>} Array of model name strings (e.g., ["llama2", "mistral"])
+ *
+ * @throws {OllamaError} If connection fails or CORS blocks access
+ *
+ * @example
+ *   try {
+ *     const models = await getAvailableModels();
+ *     console.log(models); // ["llama3.1:8b", "mistral:latest"]
+ *   } catch (error) {
+ *     // Handle connection or CORS error
+ *   }
  */
 export async function getAvailableModels() {
-  await delay(randomDelay(800, 1200));
-
-  return [
-    {
-      id: 'llama3:8b',
-      name: 'llama3:8b',
-      displayName: 'llama3:8b',
-      description: 'General-purpose Ollama model tag.',
-      parameters: {
-        size: '8B',
-        contextWindow: 8192,
-      },
+  // Call real Ollama API instead of mock
+  const modelNames = await ollamaGetModels();
+  
+  // Return as array of model objects matching expected format
+  // (frontend can handle both string[] and object[] via polymorphism)
+  return modelNames.map(name => ({
+    id: name,
+    name: name,
+    displayName: name,
+    description: 'Ollama model',
+    parameters: {
+      // These are extracted from Ollama API if available
+      size: 'Unknown',
+      contextWindow: 4096,
     },
-    {
-      id: 'mistral:7b',
-      name: 'mistral:7b',
-      displayName: 'mistral:7b',
-      description: 'Fast and lightweight Ollama model tag.',
-      parameters: {
-        size: '7B',
-        contextWindow: 32768,
-      },
-    },
-  ];
+  }));
 }
 
 /**
  * getUserStories: Fetch user's saved stories for Dashboard
  * 
- * Returns mock story list for MVP.
- * Future: Fetch from database with user authentication.
+ * PHASE 4: Now calls real API endpoint /api/stories/mine
+ * Requires authentication (user must be logged in).
  * 
- * @returns {Promise<Array>} Array of StorySummary objects
+ * @returns {Promise<Array>} Array of user's stories
+ * @throws {Error} If user is not authenticated or API fails
  */
 export async function getUserStories() {
-  await delay(randomDelay(800, 1200));
-
-  return [
-    {
-      id: 'story-001',
-      slug: 'douluo-dalu-the-soul-forge',
-      title: 'Douluo Dalu - The Soul Forge',
-      fandom: 'Douluo Dalu',
-      createdAt: '2026-02-27T14:30:00Z',
-      lastModified: '2026-02-27T15:45:00Z',
-      wordCount: 1247,
-    },
-    {
-      id: 'story-002',
-      slug: 'mystical-encounters',
-      title: 'Mystical Encounters',
-      fandom: 'Original',
-      createdAt: '2026-02-26T10:15:00Z',
-      lastModified: '2026-02-26T11:20:00Z',
-      wordCount: 892,
-    },
-  ];
+  try {
+    const response = await apiGet('/stories/mine');
+    if (response.stories) {
+      return response.stories;
+    }
+    return [];
+  } catch (error) {
+    console.error('Failed to fetch user stories:', error);
+    // Return empty array on failure so UI doesn't break
+    return [];
+  }
 }
 
 /**
- * createStory: Generate story prologue from setup parameters
- * 
- * Accepts story setup (character, premise, goals) and returns
- * mocked generated prologue text.
- * Future: Call real LLM backend to generate unique content.
- * 
- * @param {Object} setup - Story setup parameters
- * @param {string} setup.fandom - Selected fandom/universe
- * @param {string} setup.character - Character description
- * @param {string} setup.premise - Story premise
- * @param {string} setup.goals - Character goals
- * @param {string} setup.model - Selected AI model ID
- * 
- * @returns {Promise<Object>} Story object with generated prologue
- * @throws {Error} If validation fails
+ * generatePrologue: Generate story opening via Ollama with system prompt
+ *
+ * PHASE 4+: Calls local Ollama with specialized story prologue system prompt.
+ * This MUST be called BEFORE createStory() to generate initial_passage content.
+ *
+ * @param {string} modelId - Model to use for generation (e.g., "llama2")
+ * @param {Object} setupContext - Story setup parameters
+ *   - fandom: string (universe/franchise)
+ *   - character: string (protagonist name/description)
+ *   - premise: string (starting situation)
+ *   - goals: string (character's objectives)
+ * @param {function} onToken - Optional callback for streaming tokens (for UI updates)
+ *
+ * @returns {Promise<string>} Generated prologue text (200-300 words)
+ * @throws {Error} If Ollama not available or generation fails
+ *
+ * @example
+ *   const prologue = await generatePrologue(
+ *     'llama2',
+ *     { fandom: 'Harry Potter', character: 'Harry', premise: 'Awakens in Hogwarts', goals: 'Learn magic' },
+ *     (token) => setStreamingText(prev => prev + token)
+ *   );
+ *
+ * IMPORTANT: This function is called from StorySetup on form submission, BEFORE createStory().
+ * The generated prologue is then passed to createStory as the initial_passage content.
  */
-export async function createStory(setup) {
-  // Validate input
-  if (!setup.character || !setup.premise || !setup.goals) {
-    throw new Error('Missing required story setup fields');
+export async function generatePrologue(modelId, setupContext, onToken) {
+  if (!modelId) {
+    throw new Error('Model ID required for prologue generation');
   }
 
-  await delay(randomDelay(1000, 1500));
+  if (!setupContext || !setupContext.fandom || !setupContext.character) {
+    throw new Error('Missing required setup context for prologue generation');
+  }
 
-  const storyId = `story-${Date.now()}`;
-  const storyTitle = `Journey in ${setup.fandom}`;
-  
-  // Generate unique slug from title
-  const existingSlugs = Array.from(slugToIdMap.keys());
-  const storySlug = generateUniqueSlug(storyTitle, existingSlugs);
+  try {
+    // Call Ollama with story prologue system prompt
+    const prologue = await generateStoryPrologue(modelId, setupContext, onToken);
 
-  // MVP interactive reader uses lorem ipsum placeholders for all passages.
-  const prologue = generateLoremIpsum(2, 4);
+    if (!prologue || prologue.trim().length === 0) {
+      throw new Error('Ollama generated empty prologue. Try again?');
+    }
 
-  const createdStory = {
-    id: storyId,
-    slug: storySlug,
-    title: storyTitle,
-    fandom: setup.fandom,
-    prologue,
-    characterSetup: setup,
-    createdAt: new Date().toISOString(),
-    lastModified: new Date().toISOString(),
-    passages: [
-      {
-        id: 'passage-0',
-        text: prologue,
-        choices: [],
-        displayedAt: null,
-        selectedChoiceId: null,
-        selectedResponseText: null,
+    return prologue;
+  } catch (error) {
+    console.error('Failed to generate prologue:', error);
+    throw error;
+  }
+}
+
+/**
+ * createStory: Create new story with pre-generated prologue
+ * 
+ * PHASE 4: Calls real API endpoint POST /api/stories/create
+ * IMPORTANT: Prologue MUST be generated via generatePrologue() BEFORE calling this.
+ * 
+ * Generates a unique story ID and persists to database with prologue content.
+ * Requires authentication (user must be logged in).
+ * 
+ * @param {Object} setup - Story setup parameters  
+ * @param {string} setup.title - Story title (Book Name)
+ * @param {string} setup.visibility - 'public' or 'private'
+ * @param {Object} setup.setup_context - Story context (model_id, fandom, character, premise, goals)
+ * @param {Object} setup.initial_passage - Already-generated passage: { content: prologue_text }
+ * 
+ * FLOW (from StorySetup.jsx):
+ * 1. User fills form and clicks "Begin Story"
+ * 2. Validate form fields
+ * 3. Show loading: "✨ Weaving your tale..."
+ * 4. Call generatePrologue() with setup_context to generate prologue via Ollama
+ * 5. Call createStory() with generated prologue in initial_passage.content
+ * 6. API persists story with prologue to MongoDB
+ * 7. Navigate to StoryReader to display the generated story
+ *
+ * @returns {Promise<Object>} Created story object with ID
+ * @throws {Error} If validation fails, not authenticated, or API fails
+ */
+export async function createStory(setup) {
+  // Validate required fields
+  if (!setup.title || !setup.visibility || !setup.setup_context) {
+    throw new Error('Missing required story setup fields: title, visibility, setup_context');
+  }
+
+  if (!setup.initial_passage || !setup.initial_passage.content) {
+    throw new Error('Prologue not generated. Call generatePrologue() before createStory()');
+  }
+
+  try {
+    // Call real API to create story with pre-generated prologue
+    const response = await apiPost('/stories/create', {
+      title: setup.title,
+      visibility: setup.visibility,
+      setup_context: setup.setup_context,
+      initial_passage: {
+        content: setup.initial_passage.content, // Pre-generated prologue from Ollama
       },
-    ],
-    currentPassageIndex: 0,
-    wordCount: prologue.split(/\s+/).length,
-  };
+    });
 
-  storyStore.set(storyId, createdStory);
-  slugToIdMap.set(storySlug, storyId);
+    // Use API slug if provided, otherwise generate one locally
+    const slug = response.slug || generateUniqueSlug(setup.title);
 
-  return createdStory;
+    // Return created story with ID and slug for navigation
+    if (response.id) {
+      return {
+        id: response.id,
+        slug: slug, // Use generated slug for URL navigation
+        title: response.title,
+        visibility: response.visibility,
+        created_at: response.created_at,
+        updated_at: response.updated_at,
+      };
+    }
+
+    throw new Error('No story ID returned from API');
+  } catch (error) {
+    console.error('Failed to create story:', error);
+    throw error;
+  }
+}
+
+/**
+ * forkStory: Create a forked copy of a public story with user response
+ * 
+ * Called when a user responds to another user's public story.
+ * Creates a new story with copied passages plus the new response.
+ * Title format: "{Original Title} - {Username}" (server-generated).
+ * Visibility defaults to "private" for forks.
+ * 
+ * @param {string} storyId - Original story ID or slug
+ * @param {string} [userResponseText] - Optional user's response text
+ * @returns {Promise<Object>} Created fork with id, slug, title, etc.
+ * @throws {Error} If not authenticated, story not public, or validation fails
+ */
+export async function forkStory(storyId, userResponseText = '') {
+  if (!storyId || typeof storyId !== 'string') {
+    throw new Error('Story ID is required to fork a story');
+  }
+
+  try {
+    console.log('forkStory: Making API call with story_id:', storyId);
+    const payload = { story_id: storyId };
+    if (typeof userResponseText === 'string' && userResponseText.trim().length > 0) {
+      payload.response = {
+        content: userResponseText.trim(),
+      };
+    }
+
+    const response = await apiPost('/stories/fork', payload);
+
+    console.log('forkStory: API response:', response);
+
+    const fork = {
+      id: response.id,
+      slug: response.slug,
+      title: response.title,
+      author_id: response.author_id,
+      visibility: response.visibility,
+      original_fork_id: response.original_fork_id,
+      created_at: response.created_at,
+      updated_at: response.updated_at,
+    };
+    
+    console.log('forkStory: Returning fork object:', fork);
+    return fork;
+  } catch (error) {
+    console.error('Failed to fork story:', error);
+    throw error;
+  }
 }
 
 /**
@@ -253,34 +397,10 @@ export async function createStory(setup) {
  * @returns {Promise<Object>} Full Story object
  */
 export async function getStoryById(storyId) {
-  await delay(randomDelay(800, 1200));
+  await delay(randomDelay(300, 600));
 
-  const storedStory = storyStore.get(storyId);
-  if (storedStory) {
-    return structuredClone(storedStory);
-  }
-
-  // Return mock story for MVP
-  return {
-    id: storyId,
-    slug: 'your-adventure-continues',
-    title: 'Your Adventure Continues',
-    fandom: 'Douluo Dalu',
-    prologue: generateLoremIpsum(2, 4),
-    createdAt: '2026-02-27T14:30:00Z',
-    lastModified: new Date().toISOString(),
-    passages: [
-      {
-        id: 'passage-0',
-        text: generateLoremIpsum(2, 4),
-        choices: [],
-        selectedChoiceId: null,
-        selectedResponseText: null,
-      },
-    ],
-    currentPassageIndex: 0,
-    wordCount: 12,
-  };
+  const response = await apiGet(`/stories/by-slug?slug=${encodeURIComponent(storyId)}`);
+  return normalizeStoryFromApi(response);
 }
 
 /**
@@ -297,104 +417,91 @@ export async function getStoryBySlug(slug) {
   if (!isValidSlug(slug)) {
     throw new Error('Invalid story slug format');
   }
+  await delay(randomDelay(300, 600));
 
-  await delay(randomDelay(800, 1200));
-
-  // Check if slug exists in map
-  const storyId = slugToIdMap.get(slug);
-  if (storyId) {
-    const storedStory = storyStore.get(storyId);
-    if (storedStory) {
-      return structuredClone(storedStory);
-    }
-  }
-
-  // Fallback for mock stories from getUserStories
-  if (slug === 'douluo-dalu-the-soul-forge') {
-    return {
-      id: 'story-001',
-      slug: 'douluo-dalu-the-soul-forge',
-      title: 'Douluo Dalu - The Soul Forge',
-      fandom: 'Douluo Dalu',
-      prologue: generateLoremIpsum(2, 4),
-      createdAt: '2026-02-27T14:30:00Z',
-      lastModified: '2026-02-27T15:45:00Z',
-      passages: [
-        {
-          id: 'passage-0',
-          text: generateLoremIpsum(2, 4),
-          choices: [],
-          selectedChoiceId: null,
-          selectedResponseText: null,
-        },
-      ],
-      currentPassageIndex: 0,
-      wordCount: 1247,
-    };
-  }
-
-  if (slug === 'mystical-encounters') {
-    return {
-      id: 'story-002',
-      slug: 'mystical-encounters',
-      title: 'Mystical Encounters',
-      fandom: 'Original',
-      prologue: generateLoremIpsum(2, 4),
-      createdAt: '2026-02-26T10:15:00Z',
-      lastModified: '2026-02-26T11:20:00Z',
-      passages: [
-        {
-          id: 'passage-0',
-          text: generateLoremIpsum(2, 4),
-          choices: [],
-          selectedChoiceId: null,
-          selectedResponseText: null,
-        },
-      ],
-      currentPassageIndex: 0,
-      wordCount: 892,
-    };
-  }
-
-  // Story not found
-  throw new Error(`Story with slug "${slug}" not found`);
+  const response = await apiGet(`/stories/by-slug?slug=${encodeURIComponent(slug)}`);
+  return normalizeStoryFromApi(response);
 }
 
 /**
  * getNextPassage: Generate next story passage based on user text input
  * 
- * Simulates AI-powered story continuation. Returns lorem ipsum passage
- * with 2-4 new choices for MVP. In production, this calls the real LLM backend.
+ * PHASE 4+: Streams real Ollama output with system prompts.
+ * Caller provides generation context and a token callback for streaming UI updates.
  * 
  * @param {string} storyId - Story identifier
  * @param {string} userResponse - Free-text response from user
+ * @param {Object} options - Generation options
+ * @param {string} options.modelId - Ollama model ID to use
+ * @param {Object} options.context - Story context for system prompt
+ * @param {function} [options.onToken] - Token callback for streaming UI updates
  * @returns {Promise<Object>} New StoryPassage object
- * @throws {Error} If story not found or generation fails (5% chance)
+ * @throws {Error} If generation fails
  */
-export async function getNextPassage(storyId, userResponse) {
-  // Simulate AI generation time
-  await delay(randomDelay(1200, 2000));
+export async function getNextPassage(storyId, userResponse, options = {}) {
+  const { modelId, context, onToken } = options;
 
-  // 5% failure rate for testing error handling
-  if (Math.random() < 0.05) {
-    throw {
-      error: 'GENERATION_FAILED',
-      message: 'The threads of fate are tangled. Try again?',
-      retryable: true,
-    };
+  if (!storyId) {
+    throw new Error('Story ID required for passage generation');
   }
 
-  const text = generateLoremIpsum(2, 4);
+  if (!modelId) {
+    throw new Error('Model ID required for passage generation');
+  }
 
-  // Generate new passage
-  return {
-    id: `passage-${Date.now()}`,
-    text,
-    choices: [],
-    displayedAt: null, // Set by UI when rendered
-    selectedChoiceId: null, // Will be set when user makes next choice
-    selectedResponseText: null,
-  };
+  if (!context) {
+    throw new Error('Story context required for passage generation');
+  }
+
+  try {
+    const text = await generateStoryPassage(modelId, context, onToken);
+
+    if (!text || text.trim().length === 0) {
+      throw new Error('Ollama generated empty passage. Try again?');
+    }
+
+    return {
+      id: `passage-${Date.now()}`,
+      text,
+      displayedAt: null,
+    };
+  } catch (error) {
+    console.error('Failed to generate next passage:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update a story (passages, visibility, title, etc.)
+ *
+ * @param {string} storyIdOrSlug - Story ID or slug
+ * @param {Object} updates - Fields to update (passages, visibility, title)
+ * @returns {Promise<Object>} Updated story
+ */
+export async function updateStory(storyIdOrSlug, updates) {
+  try {
+    const response = await apiPut(`/api/stories/${storyIdOrSlug}`, updates);
+    return normalizeStoryFromApi(response);
+  } catch (error) {
+    console.error('Failed to update story:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a story
+ *
+ * @param {string} storyIdOrSlug - Story ID or slug
+ * @returns {Promise<Object>} Deletion confirmation
+ */
+export async function deleteStory(storyIdOrSlug) {
+  try {
+    const response = await apiDelete(`/api/stories/${storyIdOrSlug}`);
+    return response;
+  } catch (error) {
+    console.error('Failed to delete story:', error);
+    throw error;
+  }
 }
 
 /**
@@ -403,9 +510,12 @@ export async function getNextPassage(storyId, userResponse) {
 export default {
   checkOllamaConnection,
   getAvailableModels,
+  generatePrologue,
   getUserStories,
   createStory,
   getStoryById,
   getStoryBySlug,
   getNextPassage,
+  updateStory,
+  deleteStory,
 };
