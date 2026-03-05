@@ -137,7 +137,7 @@ export default function BootSequence() {
    */
   const getOllamaCommand = (shell) => {
     // Always use the current app root origin (no path segments like /dashboard).
-    const origin = `${window.location.origin}/`;
+    const origin = window.location.origin.replace(/\/+$/, '');
     
     switch (shell) {
       case 'powershell':
