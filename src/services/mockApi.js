@@ -220,23 +220,24 @@ export async function getUserStories() {
  * generatePrologue: Generate story opening via Ollama with system prompt
  *
  * PHASE 4+: Calls local Ollama with specialized story prologue system prompt.
+ * Injects TOON fandom context directly into the system prompt for rich guidance.
  * This MUST be called BEFORE createStory() to generate initial_passage content.
  *
  * @param {string} modelId - Model to use for generation (e.g., "llama2")
  * @param {Object} setupContext - Story setup parameters
- *   - fandom: string (universe/franchise)
+ *   - fandomId: string (fandom identifier for TOON lookup, e.g., 'douluo-dalu-1')
  *   - character: string (protagonist name/description)
  *   - premise: string (starting situation)
  *   - goals: string (character's objectives)
  * @param {function} onToken - Optional callback for streaming tokens (for UI updates)
  *
  * @returns {Promise<string>} Generated prologue text (200-300 words)
- * @throws {Error} If Ollama not available or generation fails
+ * @throws {Error} If Ollama not available, fandom not found, or generation fails
  *
  * @example
  *   const prologue = await generatePrologue(
  *     'llama2',
- *     { fandom: 'Harry Potter', character: 'Harry', premise: 'Awakens in Hogwarts', goals: 'Learn magic' },
+ *     { fandomId: 'douluo-dalu-1', character: 'Tang San', premise: 'Discovers a hidden spirit ring', goals: 'Master the spirit arts' },
  *     (token) => setStreamingText(prev => prev + token)
  *   );
  *
@@ -248,7 +249,7 @@ export async function generatePrologue(modelId, setupContext, onToken) {
     throw new Error('Model ID required for prologue generation');
   }
 
-  if (!setupContext || !setupContext.fandom || !setupContext.character) {
+  if (!setupContext || !setupContext.fandomId || !setupContext.character) {
     throw new Error('Missing required setup context for prologue generation');
   }
 
