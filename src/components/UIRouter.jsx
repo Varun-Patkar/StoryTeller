@@ -29,6 +29,7 @@ import NotFound from '@/components/ui/NotFound';
 const StorySetup = lazy(() => import('@/components/ui/StorySetup'));
 const StoryReader = lazy(() => import('@/components/ui/StoryReader'));
 const OAuthCallback = lazy(() => import('@/routes/OAuthCallback'));
+const About = lazy(() => import('@/components/ui/About'));
 
 /**
  * RootRoute: Handles both boot sequence and model selection at root URL
@@ -139,6 +140,9 @@ export default function UIRouter() {
           
           {/* OAuth callback: No protection needed */}
           <Route path="/auth/callback" element={<OAuthCallback />} />
+          
+          {/* About page: Public access, no prerequisites */}
+          <Route path="/about" element={<About />} />
           
           {/* Dashboard: Requires connection and model */}
           <Route 

@@ -29,6 +29,7 @@ export function useRouteSync() {
   const pathToPhase = {
     '/dashboard': 'DASHBOARD',
     '/new': 'SETUP',
+    '/about': 'ABOUT',
   };
 
   /**
@@ -39,6 +40,7 @@ export function useRouteSync() {
     'SELECTING_SOURCE': 'TRANSITION_TO_SELECTING_SOURCE',
     'DASHBOARD': 'TRANSITION_TO_DASHBOARD',
     'SETUP': 'TRANSITION_TO_SETUP',
+    'ABOUT': 'TRANSITION_TO_ABOUT',
     'PLAYING': 'TRANSITION_TO_PLAYING',
   };
 
@@ -48,7 +50,8 @@ export function useRouteSync() {
   const validTransitions = {
     CHECKING_ENGINE: ['SELECTING_SOURCE'],
     SELECTING_SOURCE: ['DASHBOARD'],
-    DASHBOARD: ['SETUP', 'PLAYING'],
+    DASHBOARD: ['SETUP', 'PLAYING', 'ABOUT'],
+    ABOUT: ['DASHBOARD'],
     SETUP: ['PLAYING', 'DASHBOARD'],
     PLAYING: ['DASHBOARD', 'SETUP'],
   };
@@ -67,6 +70,21 @@ export function useRouteSync() {
 
     // Wait for connection check to complete for dashboard/setup routes
     if (state.connectionStatus === 'CHECKING' && (currentPath === '/dashboard' || currentPath === '/new')) {
+      return;
+    }
+    
+    // Handle /about route - accessible to everyone, should sync phase without waiting
+    if (currentPath === '/about') {
+      if (state.phase !== 'ABOUT' && !state.isTransitioning) {
+        const canAnimate = validTransitions[state.phase]?.includes('ABOUT');
+        if (canAnimate) {
+          // Animate from current phase to ABOUT
+          dispatch({ type: 'TRANSITION_TO_ABOUT' });
+        } else {
+          // Direct access without valid source phase - sync without animation
+          dispatch({ type: 'SYNC_PHASE_FROM_URL', payload: { phase: 'ABOUT' } });
+        }
+      }
       return;
     }
     

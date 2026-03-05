@@ -40,9 +40,10 @@ const initialState = {
  * Defines which phases can transition to which phases
  */
 const validTransitions = {
-  CHECKING_ENGINE: ['SELECTING_SOURCE'],
-  SELECTING_SOURCE: ['DASHBOARD'],
-  DASHBOARD: ['SETUP', 'PLAYING'],
+  CHECKING_ENGINE: ['SELECTING_SOURCE', 'ABOUT'], // Can access About even when offline
+  SELECTING_SOURCE: ['DASHBOARD', 'ABOUT'], // Can access About from model selection
+  DASHBOARD: ['SETUP', 'PLAYING', 'ABOUT'], // Can go to setup, playing, or about
+  ABOUT: ['DASHBOARD', 'SELECTING_SOURCE', 'CHECKING_ENGINE'], // Can go back to any early phase
   SETUP: ['PLAYING', 'DASHBOARD'], // Can go back to dashboard or forward to playing
   PLAYING: ['DASHBOARD', 'SETUP'], // Can go back to dashboard or setup from story reader
 };
@@ -241,6 +242,14 @@ function appStateReducer(state, action) {
         transitionTarget: 'SETUP',
       };
 
+    case 'TRANSITION_TO_ABOUT':
+      if (state.isTransitioning) return state;
+      return {
+        ...state,
+        isTransitioning: true,
+        transitionTarget: 'ABOUT',
+      };
+
     case 'TRANSITION_TO_PLAYING':
       if (state.isTransitioning) return state;
       return {
@@ -352,7 +361,7 @@ function appStateReducer(state, action) {
           phase: urlPhase,
           isTransitioning: false,
           transitionTarget: null,
-          timestamp: new Date().toISOString(),
+          error: null,
         };
       }
       return state;

@@ -337,6 +337,19 @@ export default function Dashboard() {
             <img src="/logo.png" alt="StoryTeller logo" className="h-12 sm:h-30 w-auto" />
           </div>
           <div className="flex items-center gap-4">
+            {/* About link - accessible to all users */}
+            <button
+              onClick={() => {
+                if (!state.isTransitioning) {
+                  dispatch({ type: 'TRANSITION_TO_ABOUT' });
+                  navigate('/about');
+                }
+              }}
+              disabled={state.isTransitioning}
+              className="px-4 py-2 text-blue-300 hover:text-blue-100 hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              About
+            </button>
             {isAuthenticated && (
               <Button onClick={handleCreateNew} disabled={state.isTransitioning}>
                 Create New +

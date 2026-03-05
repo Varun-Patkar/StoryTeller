@@ -10,6 +10,7 @@ import { lazy } from 'react';
  * - / : Boot sequence (CHECKING_ENGINE phase)
  * - /select-model : Model selection (SELECTING_SOURCE phase)
  * - /dashboard : Story dashboard (DASHBOARD phase)
+ * - /about : About page (ABOUT pseudo-phase for animation consistency)
  * - /setup : Story creation form (SETUP phase)
  * - /story/:slug : Story reading interface (PLAYING phase)
  * 
@@ -23,6 +24,7 @@ const Dashboard = lazy(() => import('./components/ui/Dashboard'));
 const StorySetup = lazy(() => import('./components/ui/StorySetup'));
 const StoryReader = lazy(() => import('./components/ui/StoryReader'));
 const OAuthCallback = lazy(() => import('./routes/OAuthCallback'));
+const About = lazy(() => import('./components/ui/About'));
 
 /**
  * Route configuration array
@@ -55,6 +57,13 @@ export const routes = [
     phase: null, // No phase - callback only
     protected: false,
     requires: [],
+  },
+  {
+    path: '/about',
+    component: About,
+    phase: 'ABOUT', // Pseudo-phase for animation sync (same surface view as SETUP)
+    protected: false,
+    requires: [], // Accessible to all users
   },
   {
     path: '/new',
