@@ -1,0 +1,113 @@
+metadata{id,label,description}:
+  douluo-dalu-1,Douluo Dalu,The first era where where humans awaken Martial Souls at age six and grow stronger by absorbing Spirit Rings from Spirit Beasts. Power, sects, bloodlines, and ancient divine forces shape the fate of the continent.
+
+tone{guideline}:
+  Eastern cultivation storytelling with sect politics and hierarchy
+  Respect for masters, elders, and lineage traditions
+  Serious progression through hardship, training, and combat
+  Mysticism, destiny, bloodlines, and ancient inheritances
+  Moments of humor through character interactions but overall epic tone
+  Terminology must follow canon: Spirit Power, Martial Soul, Spirit Ring, Spirit Bone
+  Ring colors and ranks must be treated as important status symbols
+  Combat should emphasize martial soul abilities and ring techniques
+
+lore{rule}:
+  MARTIAL_SOUL_AWAKENING: Every child undergoes Martial Soul awakening at age six. The soul can manifest as an animal, plant, weapon, or abstract ability. Some are powerful bloodline spirits while others are considered useless.
+
+  INNATE_SPIRIT_POWER: Awakening also reveals innate spirit power (0–10). High innate power indicates talent and determines early cultivation speed.
+
+  SPIRIT_RINGS: Spirit Masters grow stronger by absorbing rings from Spirit Beasts they kill. Rings grant new abilities tied to the martial soul.
+
+  RING_COLORS:
+    White: 10 years
+    Yellow: 100 years
+    Purple: 1,000 years
+    Black: 10,000 years
+    Red: 100,000 years
+    Gold: God-level rings (extremely rare)
+
+  SPIRIT_BONES: Rare treasures dropped by powerful spirit beasts that grant additional abilities and fuse with the body.
+
+  SPIRIT_RANKS:
+    1–9  : Spirit Scholar
+    10–19: Spirit Master
+    20–29: Grand Spirit Master
+    30–39: Spirit Elder
+    40–49: Spirit Ancestor
+    50–59: Spirit King
+    60–69: Spirit Emperor
+    70–79: Spirit Sage
+    80–89: Spirit Douluo
+    90–94: Titled Douluo
+    95–98: Super Douluo
+    99   : Ultimate Douluo
+
+  TITLE_DOULUO: Rank 90+ masters receive titles based on their martial soul and become the strongest forces on the continent.
+
+  DUAL_MARTIAL_SOULS: Extremely rare ability to possess two martial souls. Only a few geniuses in history possess this trait.
+
+  SPIRIT_BEASTS: Intelligent magical creatures living in ancient forests like the Star Dou Forest and Extreme North. Older beasts possess immense power and some can transform into humans after reaching 100,000 years.
+
+  GOD_REALM: Powerful beings who ascended beyond rank 100. They oversee the world and maintain balance between humans and spirit beasts.
+
+  DRAGON_GOD_HISTORY: The ancient Dragon God once ruled spirit beasts but split into the Golden Dragon King and Silver Dragon King after a divine war.
+
+magic_system{mechanism}:
+  Cultivation uses Spirit Power, not mana or spellcasting
+  Martial Souls determine the style of combat and abilities
+  Each Spirit Ring grants one skill tied to the martial soul
+  Higher age rings provide stronger techniques
+  Spirit power increases through meditation and battle experience
+  Compatibility between martial soul and spirit beast affects absorption success
+  Absorbing rings beyond one's limit causes backlash or death
+  Spirit bones add permanent passive abilities
+  Bloodlines (dragon, phoenix, etc.) can mutate martial souls over time
+
+major_characters{figures}:
+  Tang San: Protagonist of the original story. Possesses dual martial souls (Blue Silver Grass and Clear Sky Hammer). Founder of Tang Sect techniques in Douluo world.
+
+  Yu Xiaogang: Known as "Grandmaster." Member of the Blue Lightning Tyrant Dragon clan whose mutated martial soul Luo San Pao is considered a failure. Brilliant theorist of martial soul research.
+
+  Bibi Dong: Supreme Pontiff of Spirit Hall and extremely powerful Titled Douluo with twin martial souls.
+
+  Gu Yuena: Silver Dragon King and leader of spirit beasts. One half of the ancient Dragon God.
+
+  Dragon God: Ancient supreme ruler of spirit beasts whose power split into Golden Dragon King and Silver Dragon King.
+
+factions{powers}:
+  Spirit Hall: The most powerful organization controlling martial soul awakenings and hunting spirit beasts.
+
+  Blue Lightning Tyrant Dragon Clan: One of the strongest dragon martial soul families with lightning dragon bloodline.
+
+  Clear Sky Sect: Legendary hammer martial soul sect once considered the strongest in the world.
+
+  Seven Treasure Glazed Tile Sect: Powerful support-type sect specializing in amplification abilities.
+
+  Tang Sect: Organization founded by Tang San focused on hidden weapons and techniques.
+
+locations{regions}:
+  Star Dou Forest: Largest spirit beast habitat and extremely dangerous hunting ground.
+
+  Heaven Dou Empire: One of the two great human empires on the continent.
+
+  Star Luo Empire: Rival empire known for militaristic strength.
+
+  Extreme North: Frozen land inhabited by terrifying ancient spirit beasts.
+
+culture{aspect}:
+  Rank determines social status and authority
+  Young cultivators seek mentors and sect protection
+  Spirit beast hunts are rites of passage
+  Sects compete for influence, territory, and disciples
+  Noble bloodlines and martial soul heritage create strong class divides
+  Betrayal of one's sect is considered a grave dishonor
+  Power often determines political authority
+
+avoid{pitfall}:
+  Do not treat powers like generic fantasy magic
+  Do not ignore spirit ring colors or age scaling
+  Martial soul abilities must logically relate to the soul type
+  Spirit beasts are intelligent and dangerous, not simple monsters
+  Respect cultivation hierarchy and rank authority
+  Avoid modern slang or video-game terminology
+  Maintain internal consistency of ring limits and power scaling

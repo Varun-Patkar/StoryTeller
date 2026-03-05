@@ -84,7 +84,7 @@ export default function StoryReader() {
           const modelId = state.selectedModel.ollamaTag || state.selectedModel.id;
 
           const context = {
-            fandom: story.setup_context?.fandom || story.fandom || 'Original',
+            fandomId: story.setup_context?.fandomId || story.fandom_id,
             character: story.setup_context?.character || 'The protagonist',
             storyTitle: story.title || 'Untitled Tale',
             passageHistory: story.passages.slice(-2).map(p => p.text || p.content || ''),
@@ -408,7 +408,7 @@ export default function StoryReader() {
       const recentPassageText = story.passages[story.passages.length - 1]?.text || '';
 
       const context = {
-        fandom: story.setup_context?.fandom || story.fandom || 'Original',
+        fandomId: story.setup_context?.fandomId || story.fandom_id,
         character: story.setup_context?.character || 'The protagonist',
         storyTitle: story.title || 'Untitled Tale',
         passageHistory: recentPassageText ? [recentPassageText] : [],

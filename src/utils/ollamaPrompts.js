@@ -9,7 +9,10 @@
  * - Ensuring consistency across generated passages
  *
  * Each prompt is optimized for streaming generation and token efficiency.
+ * Fandom context is injected as raw TOON format for minimal token overhead.
  */
+
+import { getFandomToonContext } from '@/utils/fandomTones';
 
 /**
  * Generate system prompt for story prologue creation
@@ -17,24 +20,35 @@
  * Called once when user submits StorySetup form to generate the opening passage.
  * Sets the narrative tone, establishes character perspective, and hooks the user
  * with an engaging opening that respects the user's fandom/character/premise setup.
+ * 
+ * TOON fandom context is injected directly to minimize tokens while providing rich guidance.
  *
  * @param {Object} setupContext - User-provided story context
- * @param {string} setupContext.fandom - The universe/franchise (e.g., "Harry Potter")
+ * @param {string} setupContext.fandomId - Fandom identifier (e.g., 'douluo-dalu')
  * @param {string} setupContext.character - Protagonist name/description
  * @param {string} setupContext.premise - Starting situation (e.g., "awakens in Hogwarts")
  * @param {string} setupContext.goals - Character's initial objectives
  * @returns {string} System prompt for Ollama to generate prologue
  */
 export function getPrologueSystemPrompt(setupContext) {
-  const { fandom, character, premise, goals } = setupContext || {};
+  const { fandomId, character, premise, goals } = setupContext || {};
+
+  // Load raw TOON context for the fandom
+  let fandomContext = '';
+  if (fandomId) {
+    try {
+      fandomContext = `\nFANDOM CONTEXT (TOON format):\n${getFandomToonContext(fandomId)}\n`;
+    } catch (error) {
+      console.warn(`Could not load fandom context for ${fandomId}:`, error.message);
+    }
+  }
 
   return `You are a master storyteller creating an immersive interactive fiction experience.
 
-UNIVERSE: ${fandom || 'A mystical realm'}
 PROTAGONIST: ${character || 'A brave adventurer'}
 SETTING: ${premise || 'An ordinary day transforms into something extraordinary'}
 INITIAL GOAL: ${goals || 'Survive and understand what\'s happening'}
-
+${fandomContext}
 YOUR TASK:
 Generate the opening passage (prologue) of an interactive story. This is the FIRST passage the reader will experience.
 
@@ -63,9 +77,11 @@ OUTPUT:
  * Called when user submits free-text response to generate the next passage.
  * Continues the narrative based on user input while maintaining consistency,
  * tone, and world-building.
+ * 
+ * TOON fandom context is re-injected for every passage to ensure consistency.
  *
  * @param {Object} context - Story context for generation
- * @param {string} context.fandom - The universe/franchise
+ * @param {string} context.fandomId - Fandom identifier
  * @param {string} context.character - Protagonist (from setup)
  * @param {string} context.storyTitle - The story's title
  * @param {Array<string>} context.passageHistory - Previous passage texts (most recent first)
@@ -74,7 +90,7 @@ OUTPUT:
  */
 export function getProgressionSystemPrompt(context) {
   const {
-    fandom = 'A mystical realm',
+    fandomId,
     character = 'The protagonist',
     storyTitle = 'An Untold Tale',
     passageHistory = [],
@@ -84,12 +100,21 @@ export function getProgressionSystemPrompt(context) {
   // Get the most recent passage for immediate context (prevents token explosion)
   const recentPassage = passageHistory[0] || '[The story begins...]';
 
+  // Load raw TOON context for the fandom
+  let fandomContext = '';
+  if (fandomId) {
+    try {
+      fandomContext = `\nFANDOM CONTEXT (TOON format):\n${getFandomToonContext(fandomId)}\n`;
+    } catch (error) {
+      console.warn(`Could not load fandom context for ${fandomId}:`, error.message);
+    }
+  }
+
   return `You are a master storyteller continuing an interactive narrative.
 
 STORY TITLE: "${storyTitle}"
-UNIVERSE: ${fandom}
 PROTAGONIST: ${character}
-
+${fandomContext}
 NARRATIVE SO FAR (most recent passage):
 ${recentPassage}
 

@@ -4,6 +4,7 @@ import { useAppState } from '@/services/appState.jsx';
 import { validateStorySetup, validateTitle, validateVisibility } from '@/utils/validation';
 import { createStory, generatePrologue } from '@/services/mockApi';
 import { ApiError, apiGet } from '@/services/apiClient';
+import { getAvailableFandoms } from '@/utils/fandomTones';
 import Button from '@/components/common/Button';
 import Dropdown from '@/components/common/Dropdown';
 import TextArea from '@/components/common/TextArea';
@@ -36,14 +37,8 @@ export default function StorySetup() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [prologueLoading, setPrologueLoading] = useState(false);
 
-  // Available fandoms for the dropdown
-  const fandomOptions = [
-    { value: 'douluo-dalu', label: 'Douluo Dalu' },
-    { value: 'naruto', label: 'Naruto' },
-    { value: 'one-piece', label: 'One Piece' },
-    { value: 'aot', label: 'Attack on Titan' },
-    { value: 'custom', label: 'Custom Universe' },
-  ];
+  // Available fandoms from TOON registry
+  const fandomOptions = getAvailableFandoms();
 
   /**
    * Handles input changes for form fields.
@@ -162,9 +157,9 @@ export default function StorySetup() {
       setErrors({});
       setPrologueLoading(true);
 
-      // Prepare setup context for prologue generation
+      // Prepare setup context with fandomId for TOON injection
       const setupContext = {
-        fandom: fandomOptions.find(opt => opt.value === formData.fandom)?.label || formData.fandom,
+        fandomId: formData.fandom,
         character: formData.character,
         premise: formData.premise,
         goals: formData.goals,
@@ -183,15 +178,17 @@ export default function StorySetup() {
       setPrologueLoading(false);
 
       // Now create story with generated prologue
+      const fandomLabel = fandomOptions.find(opt => opt.value === formData.fandom)?.label || formData.fandom;
       const setupPayload = {
         title: formData.title,
         visibility: formData.visibility,
         setup_context: {
           model_id: state.selectedModel?.ollamaTag || 'llama3.1:8b',
-          fandom: setupContext.fandom,
-          character: setupContext.character,
-          premise: setupContext.premise,
-          goals: setupContext.goals,
+          fandom: fandomLabel,
+          fandomId: formData.fandom,
+          character: formData.character,
+          premise: formData.premise,
+          goals: formData.goals,
         },
         initial_passage: {
           content: prologue,
