@@ -130,26 +130,24 @@ export default function BootSequence() {
 
   /**
    * Generate the correct Ollama startup command based on shell type.
-   * Uses deployed BASE_URL from environment for CORS configuration.
+   * Uses the current browser location origin for CORS configuration.
    * 
    * @param {string} shell - 'powershell', 'bash', or 'cmd'
    * @returns {string} The command to run in the terminal
    */
   const getOllamaCommand = (shell) => {
-    // In development: localhost:5173 (Vite). In production: deployed app URL from .env BASE_URL
-    const deployedUrl = import.meta.env.VITE_DEPLOYED_URL || 'https://storyteller-rho.vercel.app';
-    const devUrl = 'http://localhost:5173';
-    const origins = `${devUrl};${deployedUrl}`;
+    // Always use the current app root origin (no path segments like /dashboard).
+    const origin = `${window.location.origin}/`;
     
     switch (shell) {
       case 'powershell':
-        return `$env:OLLAMA_ORIGINS="${origins}"; ollama serve`;
+        return `$env:OLLAMA_ORIGINS="${origin}";ollama serve`;
       case 'bash':
-        return `OLLAMA_ORIGINS="${origins}" ollama serve`;
+        return `OLLAMA_ORIGINS="${origin}" ollama serve`;
       case 'cmd':
-        return `set OLLAMA_ORIGINS=${origins} && ollama serve`;
+        return `set OLLAMA_ORIGINS=${origin} && ollama serve`;
       default:
-        return `OLLAMA_ORIGINS="${origins}" ollama serve`;
+        return `OLLAMA_ORIGINS="${origin}" ollama serve`;
     }
   };
 
@@ -416,7 +414,7 @@ export default function BootSequence() {
                       📋 Copy
                     </button>
                   </div>
-                  <p className="text-gray-400 text-xs italic mt-2">This command includes CORS origins for both dev (localhost:5173) and production ({import.meta.env.VITE_DEPLOYED_URL || 'app.vercel.app'}).</p>
+                  <p className="text-gray-400 text-xs italic mt-2">This command uses the current app URL root automatically (for example, https://story-teller-chi.vercel.app/).</p>
                 </div>
 
                 <div>
@@ -489,7 +487,7 @@ export default function BootSequence() {
                       📋 Copy
                     </button>
                   </div>
-                  <p className="text-gray-400 text-xs italic mt-2">⚠️ This only works for local development. Deployed app MUST use a dev tunnel.</p>
+                  <p className="text-gray-400 text-xs italic mt-2">This command uses your current app URL root automatically.</p>
                 </div>
               )}
             </div>
