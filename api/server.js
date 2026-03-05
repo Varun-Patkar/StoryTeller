@@ -33,10 +33,20 @@ app.use(express.json());
 // CORS middleware
 app.use((req, res, next) => {
   const requestOrigin = req.headers.origin;
-  const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:3000")
+  
+  // Build array of allowed origins
+  let configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:3000")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+  
+  // Add BASE_URL if configured (for Vercel frontend)
+  if (process.env.BASE_URL) {
+    const baseUrl = process.env.BASE_URL.replace(/\/$/, ""); // Remove trailing slash
+    if (!configuredOrigins.includes(baseUrl)) {
+      configuredOrigins.push(baseUrl);
+    }
+  }
 
   const fallbackOrigin = configuredOrigins[0] || "http://localhost:5173";
   const origin = requestOrigin && configuredOrigins.includes(requestOrigin)

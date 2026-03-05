@@ -17,13 +17,21 @@
 
 /**
  * Get Ollama base URL.
- * Defaults to localhost:11434 (standard Ollama port)
- * Can be overridden via environment variable for custom deployments.
+ * Uses dev tunnel URL from localStorage if set, otherwise defaults to localhost:11434.
  *
  * @returns {string} Ollama base URL
  */
 export function getOllamaBaseUrl() {
-  return import.meta.env.VITE_OLLAMA_BASE_URL || "http://localhost:11434";
+  // Check for dev tunnel URL from localStorage
+  if (typeof window !== 'undefined') {
+    const devTunnelUrl = localStorage.getItem('devTunnelUrl');
+    if (devTunnelUrl?.trim()) {
+      return devTunnelUrl.replace(/\/$/, ''); // Remove trailing slash
+    }
+  }
+  
+  // Default to localhost Ollama
+  return "http://localhost:11434";
 }
 
 /**

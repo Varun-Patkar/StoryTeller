@@ -20,6 +20,11 @@ export default function BootSequence() {
   const [isChecking, setIsChecking] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedShell, setSelectedShell] = useState('powershell');
+  const [tunnelHelpTab, setTunnelHelpTab] = useState('vscode');
+  const [devTunnelUrl, setDevTunnelUrl] = useState(
+    () => localStorage.getItem('devTunnelUrl') || ''
+  );
+  const [tunnelUrlError, setTunnelUrlError] = useState('');
 
   /**
    * Executes one connection check cycle and updates global state.
@@ -83,7 +88,7 @@ export default function BootSequence() {
       state.connectionStatus === 'ONLINE' &&
       !state.isTransitioning
     ) {
-      // Transition to model selection phase (stays at same URL)
+      // Connection successful - move to model selection
       dispatch({ type: 'TRANSITION_TO_SELECTING_SOURCE' });
     }
   }, [state.phase, state.connectionStatus, state.isTransitioning, dispatch]);
@@ -99,13 +104,43 @@ export default function BootSequence() {
   };
 
   /**
+   * Save dev tunnel URL and retry connection
+   */
+  const handleSaveTunnelAndRetry = () => {
+    const trimmed = devTunnelUrl.trim();
+    
+    if (!trimmed) {
+      setTunnelUrlError('Please enter a dev tunnel URL');
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(trimmed);
+      localStorage.setItem('devTunnelUrl', trimmed);
+      dispatch({ type: 'OLLAMA_URL_CONFIGURED', payload: { devTunnelUrl: trimmed } });
+      setTunnelUrlError('');
+      // Retry connection with new URL
+      dispatch({ type: 'CONNECTION_RETRY' });
+      runConnectionCheck();
+    } catch {
+      setTunnelUrlError('Invalid URL. Must be https://your-tunnel.devtunnels.ms');
+    }
+  };
+
+  /**
    * Generate the correct Ollama startup command based on shell type.
+   * Uses deployed BASE_URL from environment for CORS configuration.
    * 
    * @param {string} shell - 'powershell', 'bash', or 'cmd'
    * @returns {string} The command to run in the terminal
    */
   const getOllamaCommand = (shell) => {
-    const origins = 'http://localhost:5173;http://localhost:3000';
+    // In development: localhost:5173 (Vite). In production: deployed app URL from .env BASE_URL
+    const deployedUrl = import.meta.env.VITE_DEPLOYED_URL || 'https://storyteller-rho.vercel.app';
+    const devUrl = 'http://localhost:5173';
+    const origins = `${devUrl};${deployedUrl}`;
+    
     switch (shell) {
       case 'powershell':
         return `$env:OLLAMA_ORIGINS="${origins}"; ollama serve`;
@@ -168,139 +203,140 @@ export default function BootSequence() {
           </div>
         )}
 
-        {/* OFFLINE STATE - CLEAR STEP-BY-STEP INSTRUCTIONS */}
+        {/* OFFLINE STATE - DEV TUNNEL URL EDITOR */}
         {state.connectionStatus === 'OFFLINE' && (
           <div className="text-center">
-            <p className="text-4xl mb-4">💤</p>
-            <h1 className="text-2xl md:text-3xl text-red-200 font-semibold mb-6">
-              The gateway sleeps...
+            <p className="text-4xl mb-4">🔌</p>
+            <h1 className="text-2xl md:text-3xl text-red-200 font-semibold mb-3">
+              Dev tunnel not configured
             </h1>
-            
+            <p className="text-red-300 text-sm mb-6">
+              StoryTeller requires access to your local Ollama instance via a dev tunnel.
+              <br/><span className="text-xs text-gray-300 mt-2 block">This is a BYOM (Bring Your Own Model) application. Enter your dev tunnel URL to access your Ollama.</span>
+            </p>
+
             <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-5 mb-6 text-left">
-              <div className="mb-4">
-                <p className="text-red-200 font-semibold mb-3">
-                  ⚠️ Ollama is not running
-                </p>
-                <p className="text-red-100 text-sm leading-relaxed mb-4">
-                  Ollama must be started on your local machine for StoryTeller to work.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-amber-200 text-sm font-semibold mb-2">
-                    📥 Step 1: Download & Install Ollama (if needed)
-                  </p>
-                  <p className="text-gray-300 text-xs mb-2">
-                    If you haven't installed Ollama yet:
-                  </p>
-                  <p className="text-blue-300 text-xs font-mono bg-black/40 p-2 rounded break-all">
-                    Visit: https://ollama.ai
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-amber-200 text-sm font-semibold mb-2">
-                    🖥️ Step 2: Open a New Terminal
-                  </p>
-                  <p className="text-gray-300 text-xs mb-2">
-                    Open a terminal where you can keep Ollama running continuously (PowerShell, Terminal, or Command Prompt).
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-amber-200 text-sm font-semibold mb-2">
-                    ▶️ Step 3: Start Ollama with CORS Support
-                  </p>
-                  <p className="text-gray-300 text-xs mb-3">
-                    Select your shell/terminal type:
-                  </p>
-                  <div className="flex gap-2 mb-3">
-                    {[
-                      { id: 'powershell', label: '⚙️ PowerShell 7' },
-                      { id: 'bash', label: '🐧 Bash (Linux/Mac)' },
-                      { id: 'cmd', label: '🟦 CMD (Windows Legacy)' }
-                    ].map(shell => (
-                      <button
-                        key={shell.id}
-                        onClick={() => setSelectedShell(shell.id)}
-                        className={`text-xs px-3 py-1 rounded transition ${
-                          selectedShell === shell.id
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                      >
-                        {shell.label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-gray-300 text-xs mb-2">
-                    Copy and paste this command, then press Enter:
-                  </p>
-                  <div className="bg-black/60 p-3 rounded border border-amber-600/30 flex items-center justify-between gap-2">
-                    <code className="text-amber-200 text-xs font-mono flex-1 break-all">
-                      {getOllamaCommand(selectedShell)}
-                    </code>
-                    <button
-                      onClick={() => copyToClipboard(getOllamaCommand(selectedShell))}
-                      className="text-blue-300 hover:text-blue-100 text-xs whitespace-nowrap ml-2 px-2 py-1 bg-blue-900/30 rounded hover:bg-blue-900/50 transition"
-                    >
-                      📋 Copy
-                    </button>
-                  </div>
-                  <p className="text-gray-400 text-xs mt-2">
-                    ⏳ Wait for "Listening on" messages to appear (5-10 seconds)
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-amber-200 text-sm font-semibold mb-2">
-                    ✅ Step 4: Come Back & Retry
-                  </p>
-                  <p className="text-gray-300 text-xs">
-                    Return to this page and click the "Retry Connection" button below.
-                  </p>
-                </div>
-              </div>
+              <label className="block text-red-200 font-semibold mb-3 text-sm">
+                🌐 Update Dev Tunnel URL
+              </label>
+              <input
+                type="text"
+                value={devTunnelUrl}
+                onChange={(e) => {
+                  setDevTunnelUrl(e.target.value);
+                  setTunnelUrlError('');
+                }}
+                placeholder="https://your-tunnel.devtunnels.ms"
+                className="w-full px-3 py-2 bg-black/50 border border-red-500/40 rounded text-gray-100 placeholder-gray-500 focus:outline-none focus:border-red-400 text-sm mb-2"
+              />
+              {tunnelUrlError && (
+                <p className="text-red-400 text-xs mb-2">❌ {tunnelUrlError}</p>
+              )}
             </div>
 
-            <Button
-              variant="secondary"
-              onClick={handleRetry}
-              disabled={isChecking || state.isTransitioning}
-            >
-              {isChecking ? 'Checking...' : 'Retry Connection'}
-            </Button>
+            <div className="flex gap-3 justify-center mb-4">
+              <Button
+                variant="primary"
+                onClick={handleSaveTunnelAndRetry}
+                disabled={isChecking || state.isTransitioning}
+              >
+                {isChecking ? 'Checking...' : '✓ Update & Retry'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleRetry}
+                disabled={isChecking || state.isTransitioning}
+              >
+                Retry with current URL
+              </Button>
+            </div>
 
-            <div className="mt-6 text-left">
+            <div className="text-left">
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
                 className="text-xs text-gray-400 hover:text-gray-200 underline"
               >
-                {showAdvanced ? '▼' : '▶'} 🆘 Troubleshooting
+                {showAdvanced ? '▼' : '▶'} 🔗 Full Setup Guide: Start Ollama & Set Up Tunnel
               </button>
               {showAdvanced && (
-                <div className="mt-3 p-4 bg-black/30 rounded text-xs text-gray-300 space-y-3 border border-gray-600/20">
+                <div className="mt-3 p-4 bg-black/30 rounded text-xs text-gray-300 space-y-4 border border-gray-600/20">
+                  {/* Step 1: Install & Start Ollama */}
                   <div>
-                    <p className="font-semibold text-amber-200 mb-1">❌ Still stuck?</p>
-                    <ul className="list-disc list-inside space-y-1 text-gray-300">
-                      <li>Make sure Ollama fully started (wait 5-10 seconds after running command)</li>
-                      <li>Check terminal for errors like "permission denied" or "port already in use"</li>
-                      <li>Make sure the terminal where you ran the command is still open and running</li>
-                    </ul>
+                    <h3 className="text-amber-200 font-semibold mb-2 text-sm">Step 1: Install & Start Ollama</h3>
+                    <p className="mb-2">If you don't have Ollama, <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">download and install it</a>.</p>
+                    <p className="mb-2">Start Ollama with CORS enabled so StoryTeller can connect. Choose your shell:</p>
+                    <div className="flex gap-2 mb-2">
+                      {[
+                        { id: 'powershell', label: '⚙️ PowerShell 7' },
+                        { id: 'bash', label: '🐧 Bash (Linux/Mac)' },
+                        { id: 'cmd', label: '🟦 CMD (Windows Legacy)' }
+                      ].map(shell => (
+                        <button
+                          key={shell.id}
+                          onClick={() => setSelectedShell(shell.id)}
+                          className={`text-xs px-3 py-1 rounded transition ${selectedShell === shell.id
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          {shell.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="bg-black/60 p-2 rounded border border-amber-600/30 flex items-center justify-between gap-2">
+                      <code className="text-amber-200 text-xs font-mono flex-1 break-all">
+                        {getOllamaCommand(selectedShell)}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(getOllamaCommand(selectedShell))}
+                        className="text-blue-300 hover:text-blue-100 text-xs whitespace-nowrap ml-2 px-2 py-1 bg-blue-900/30 rounded hover:bg-blue-900/50 transition"
+                      >
+                        📋 Copy
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold text-amber-200 mb-1">🔍 Verify Ollama is running:</p>
-                    <p className="text-gray-400">Visit http://localhost:11434/api/tags in your browser</p>
-                    <p className="text-gray-400">You should see JSON with model information, not an error</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-amber-200 mb-1">🚫 Port 11434 blocked?</p>
-                    <p className="text-gray-400">Check your firewall. Port 11434 needs to be open locally.</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-amber-200 mb-1">🎯 Different Ollama location?</p>
-                    <p className="text-gray-400">Edit VITE_OLLAMA_BASE_URL in your .env file</p>
+
+                  {/* Step 2: Dev Tunnel */}
+                  <div className="border-t border-gray-600/50 pt-4">
+                    <h3 className="text-amber-200 font-semibold mb-2 text-sm">Step 2: Start a Dev Tunnel</h3>
+                    <p className="mb-3">Expose your local Ollama securely. Choose your method:</p>
+                    
+                    <div className="flex gap-2 mb-3 border-b border-gray-600/50 pb-3">
+                      <button 
+                        onClick={() => setTunnelHelpTab('vscode')} 
+                        className={`text-xs px-3 py-1.5 rounded transition ${tunnelHelpTab === 'vscode' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                      >
+                        💻 VS Code (Recommended)
+                      </button>
+                      <button 
+                        onClick={() => setTunnelHelpTab('powershell')} 
+                        className={`text-xs px-3 py-1.5 rounded transition ${tunnelHelpTab === 'powershell' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                      >
+                        ⚙️ PowerShell CLI
+                      </button>
+                    </div>
+
+                    {tunnelHelpTab === 'vscode' && (
+                      <ol className="space-y-2 list-decimal list-inside pl-1 text-gray-300">
+                        <li>Open your VS Code editor.</li>
+                        <li>Open the Bottom Panel (<kbd className="bg-gray-800 border border-gray-600 px-1 rounded text-[10px]">Ctrl</kbd> + <kbd className="bg-gray-800 border border-gray-600 px-1 rounded text-[10px]">J</kbd>) and click the <strong>Ports</strong> tab (next to Terminal).</li>
+                        <li>Click <strong>Forward a Port</strong> and enter <code className="text-amber-200 font-mono bg-black/40 px-1 rounded">11434</code>.</li>
+                        <li>Right-click the newly forwarded port, select <strong>Port Visibility</strong>, and change it to <strong>Public</strong>.</li>
+                        <li>Copy the Forwarded Address (looks like <code className="font-mono text-[10px] text-gray-400">https://...devtunnels.ms</code>) and paste it in the box above.</li>
+                      </ol>
+                    )}
+
+                    {tunnelHelpTab === 'powershell' && (
+                      <ol className="space-y-2 list-decimal list-inside pl-1 text-gray-300">
+                        <li>Install the devtunnel CLI if you haven't (search for "microsoft dev tunnels").</li>
+                        <li>Open PowerShell and run this command:</li>
+                        <div className="ml-4 my-2 bg-black/60 p-2 rounded border border-amber-600/30 font-mono text-amber-200 text-xs break-all w-fit">
+                          devtunnel host -p 11434
+                        </div>
+                        <li>Wait for it to say "Ready to accept connections".</li>
+                        <li>Copy the Hosting URL and paste it in the box above.</li>
+                      </ol>
+                    )}
                   </div>
                 </div>
               )}
@@ -367,7 +403,7 @@ export default function BootSequence() {
                     ))}
                   </div>
                   <p className="text-gray-300 text-xs mb-2">
-                    In that same terminal, paste and run this exact command:
+                    Paste and run this exact command in your local terminal:
                   </p>
                   <div className="bg-black/60 p-3 rounded border border-amber-600/30 flex items-center justify-between gap-2">
                     <code className="text-amber-200 text-xs font-mono flex-1 break-all">
@@ -380,6 +416,7 @@ export default function BootSequence() {
                       📋 Copy
                     </button>
                   </div>
+                  <p className="text-gray-400 text-xs italic mt-2">This command includes CORS origins for both dev (localhost:5173) and production ({import.meta.env.VITE_DEPLOYED_URL || 'app.vercel.app'}).</p>
                 </div>
 
                 <div>
@@ -415,33 +452,44 @@ export default function BootSequence() {
                 onClick={() => setShowAdvanced(!showAdvanced)}
                 className="text-xs text-gray-400 hover:text-gray-200 underline"
               >
-                {showAdvanced ? '▼' : '▶'} 📚 What does "OLLAMA_ORIGINS" mean?
+                {showAdvanced ? '▼' : '▶'} � Local development: Run Ollama without tunnel
               </button>
               {showAdvanced && (
                 <div className="mt-3 p-4 bg-black/30 rounded text-xs text-gray-300 space-y-3 border border-gray-600/20">
-                  <p>
-                    <strong className="text-amber-200">CORS</strong> = Cross-Origin Resource Sharing
+                  <p className="text-amber-200 font-semibold mb-2">For local testing only (not for deployed app):</p>
+                  <p className="text-gray-300 text-xs mb-2">
+                    If running StoryTeller on localhost:5173, start Ollama directly with CORS:
                   </p>
-                  <p>
-                    It's a browser security feature that prevents websites from accessing your local services without permission.
-                  </p>
-                  <p>
-                    The <code className="bg-black/50 px-1 rounded">OLLAMA_ORIGINS</code> environment variable tells Ollama 
-                    which websites are allowed to access it.
-                  </p>
-                  <p>
-                    We're setting it to:
-                    <br/>
-                    <code className="bg-black/50 px-1 rounded text-amber-200">http://localhost:5173</code> = Your dev browser (Vite)
-                    <br/>
-                    <code className="bg-black/50 px-1 rounded text-amber-200">http://localhost:3000</code> = Production server (vercel dev)
-                  </p>
-                  <p>
-                    Without this, Ollama refuses browser requests <strong>(for your security)</strong>.
-                  </p>
-                  <p className="text-amber-200 font-semibold">
-                    💡 This is normal and expected!
-                  </p>
+                  <div className="flex gap-2 mb-3">
+                    {[
+                      { id: 'powershell', label: '⚙️ PowerShell 7' },
+                      { id: 'bash', label: '🐧 Bash (Linux/Mac)' },
+                      { id: 'cmd', label: '🟦 CMD (Windows Legacy)' }
+                    ].map(shell => (
+                      <button
+                        key={shell.id}
+                        onClick={() => setSelectedShell(shell.id)}
+                        className={`text-xs px-3 py-1 rounded transition ${selectedShell === shell.id
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                      >
+                        {shell.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="bg-black/60 p-3 rounded border border-amber-600/30 flex items-center justify-between gap-2">
+                    <code className="text-amber-200 text-xs font-mono flex-1 break-all">
+                      {getOllamaCommand(selectedShell)}
+                    </code>
+                    <button
+                      onClick={() => copyToClipboard(getOllamaCommand(selectedShell))}
+                      className="text-blue-300 hover:text-blue-100 text-xs whitespace-nowrap ml-2 px-2 py-1 bg-blue-900/30 rounded hover:bg-blue-900/50 transition"
+                    >
+                      📋 Copy
+                    </button>
+                  </div>
+                  <p className="text-gray-400 text-xs italic mt-2">⚠️ This only works for local development. Deployed app MUST use a dev tunnel.</p>
                 </div>
               )}
             </div>

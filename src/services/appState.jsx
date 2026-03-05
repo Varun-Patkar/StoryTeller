@@ -6,6 +6,7 @@ import React, { createContext, useReducer, useCallback } from 'react';
  * Manages 5-phase state machine:
  * CHECKING_ENGINE → SELECTING_SOURCE → DASHBOARD → SETUP → PLAYING
  * 
+ * Dev tunnel URL configuration happens inline in BootSequence (OFFLINE state)
  * Enforces valid transitions and prevents phase skipping
  */
 const AppStateContext = createContext();
@@ -20,6 +21,8 @@ const initialState = {
   isTransitioning: false,
   transitionTarget: null,
   connectionStatus: 'CHECKING',
+  devTunnelUrl: localStorage.getItem('devTunnelUrl') || '',
+  isDeployed: typeof window !== 'undefined' && !window.location.hostname.includes('localhost'),
   selectedModel: null,
   isModelHydrated: false,
   selectedFandom: null,
@@ -114,6 +117,13 @@ function appStateReducer(state, action) {
         error: null,
       };
 
+    case 'OLLAMA_URL_CONFIGURED':
+      return {
+        ...state,
+        devTunnelUrl: action.payload.devTunnelUrl || '',
+        error: null,
+      };
+
     // ============ Model Selection Actions ============
 
     case 'MODEL_SELECTED':
@@ -201,6 +211,19 @@ function appStateReducer(state, action) {
         isTransitioning: true,
         transitionTarget: 'SELECTING_SOURCE',
       };
+
+    case 'TRANSITION_TO':
+      // Generic transition handler (for dynamic phase transitions)
+      if (state.isTransitioning) return state;
+      const nextPhase = action.payload?.targetPhase;
+      if (nextPhase && validTransitions[state.phase]?.includes(nextPhase)) {
+        return {
+          ...state,
+          isTransitioning: true,
+          transitionTarget: nextPhase,
+        };
+      }
+      return state;
 
     case 'TRANSITION_TO_DASHBOARD':
       if (state.isTransitioning) return state; // Already transitioning
