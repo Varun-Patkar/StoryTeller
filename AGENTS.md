@@ -1,21 +1,24 @@
 # StoryTeller - AI Agent Context
 
-**Version**: 1.0.0 | **Last Updated**: 2026-02-28  
+**Version**: 2.0.0 | **Last Updated**: 2026-03-06  
 **Purpose**: AI agent guidance for working with the StoryTeller codebase
 
 ---
 
 ## Project Overview
 
-**StoryTeller** is a cinematic 3D web application for creating AI-powered interactive text adventures. The frontend remains Vite + React + 3D Canvas, while a Vercel `/api` backend handles MongoDB persistence and GitHub OAuth.
+**StoryTeller** is a cinematic 3D web application for creating AI-powered interactive text adventures. The frontend is Vite + React + 3D Canvas with direct Ollama connectivity, while a lightweight Express.js backend handles MongoDB persistence and GitHub OAuth.
 
 **Core Experience**:
-1. Mystical boot sequence checks backend service connection
-2. User selects AI model ("energy source") from dropdown
-3. Cinematic 3D camera animations zoom from space toward Earth
-4. Story Dashboard presents Resume/Create options with Earth rotating in background
-5. Story Setup form collects character, premise, and goals
-6. Final zoom transition morphs into minimalist reading interface with generated prologue
+1. Mystical boot sequence checks Ollama connection (localhost or custom URL)
+2. Optional: Configure custom Ollama URL (devtunnels, hosted VM, or any Ollama-compatible API)
+3. User selects AI model ("energy source") from dropdown
+4. Cinematic 3D camera animations zoom from space toward Earth
+5. Story Dashboard presents Explore/Your Stories with Earth rotating in background
+6. Optional GitHub sign-in for personal story management
+7. Story Setup form collects book name, character, premise, goals, and visibility
+8. Final zoom transition morphs into minimalist reading interface with AI-generated prologue
+9. Fork public stories by responding to them (creates copy under your authorship)
 
 ---
 
@@ -44,10 +47,18 @@
 - **Custom Hooks**: Encapsulate logic (usePhaseTransition, useCameraAnimation)
 
 ### Backend (Vercel /api)
-- **Runtime**: Vercel Serverless Functions (Python)
-- **Database**: MongoDB for persistence
-- **Auth**: GitHub OAuth
-- **LLM**: Ollama accessed directly from the React frontend (`http://localhost:11434`)
+- **Runtime**: Express.js (single serverless function on Vercel)
+- **Database**: MongoDB Atlas for story/user persistence
+- **Auth**: GitHub OAuth for optional sign-in
+- **Purpose**: Authentication and persistence ONLY (no Ollama proxy)
+
+### Ollama Integration (Frontend Direct)
+- **Connection**: React frontend connects directly to Ollama API
+- **Default URL**: `http://localhost:11434` (BYOE - Bring Your Own Engine)
+- **Custom URLs**: Support for devtunnels, hosted VMs, or any Ollama-compatible API
+- **CORS Handling**: Frontend detects CORS errors and provides exact fix commands
+- **Configuration**: OllamaUrlConfig component for setting custom URLs
+- **Persistence**: Custom URL stored in localStorage for future sessions
 
 ---
 
@@ -99,9 +110,21 @@ src/
 ├── components/
 │   ├── ui/          # Phase-specific UI screens (BootSequence.jsx, etc.)
 │   └── common/      # Reusable components (Button, Dropdown, TextArea)
-├── services/        # State management (appState.js) + API (mockApi.js)
-├── utils/           # Helpers (validation.js, animations.js)
+├── services/
+│   ├── appState.jsx       # Global state management (Context + useReducer)
+│   ├── apiClient.js       # Backend API wrapper (/api/auth, /api/stories)
+│   ├── ollamaClient.js    # Direct Ollama connection with streaming
+│   ├── phaseTransition.js # Phase transition logic
+│   ├── usePhaseTransition.js
+│   └── useRouteSync.js    # URL/state synchronization
+├── utils/           # Helpers (validation.js, animations.js, slugify.js)
 └── styles/          # Tailwind imports + theme customization
+
+api/
+├── server.js        # Single Express.js serverless function (all routes)
+├── _shared/         # Shared utilities (db, oauth, sessions, validation, http)
+├── auth/            # Individual auth handlers (for reference/modularity)
+└── stories/         # Individual story handlers (for reference/modularity)
 ```
 
 **Rule**: No file exceeds 500 meaningful lines of code
@@ -311,29 +334,55 @@ useGLTF.preload('/earth-like/source/Untitled.glb');
 
 ---
 
-## Mock API Contract
+## API Architecture
 
-All backend calls simulated in `src/services/mockApi.js` until `/api` endpoints replace them:
+### Ollama API (Frontend Direct Connection)
 
-### Available Functions
+Frontend connects directly to Ollama using `src/services/ollamaClient.js`:
 
-1. **`checkOllamaConnection()`** → `{ status: 'online' | 'offline', timestamp }`
-2. **`getAvailableModels()`** → `AIModel[]`
-3. **`getUserStories()`** → `StorySummary[]`
-4. **`createStory(setup)`** → `Story` (with generated prologue)
-5. **`getStoryById(id)`** → `Story`
+1. **`checkOllamaConnection()`** → `{ status: 'online' | 'offline' | 'cors_error', timestamp }`
+2. **`getAvailableModels()`** → `AIModel[]` from `/api/tags`
+3. **`generatePrologue(setup)`** → Streaming response from `/api/generate`
+4. **`generatePassage(context)`** → Streaming response with choices
 
-### Realistic Delays
-- Connection check: ~1000ms
-- Model fetch: ~800ms
-- Story creation: ~1200ms (simulates LLM generation)
+**Custom URL Support**:
+- Default: `http://localhost:11434`
+- Custom: Any URL (devtunnels, hosted VM, Ollama-compatible API)
+- Stored in: `localStorage.getItem('devTunnelUrl')` or `localStorage.getItem('ollamaBaseUrl')`
+- Configured via: OllamaUrlConfig component
 
-### Error Simulation
-- 20% offline rate for connection check
-- 5% generation failure for story creation
-- All errors return mystical messages (not technical jargon)
+**CORS Handling**:
+- Detects CORS errors and shows fix command
+- PowerShell: `$env:OLLAMA_ORIGINS="http://localhost:5173;https://*"; ollama serve`
+- Unix/Mac: `OLLAMA_ORIGINS="http://localhost:5173,https://*" ollama serve`
 
-See `specs/001-frontend-mvp/contracts/mockApi.md` for full contract details.
+### Backend API (Express.js on Vercel)
+
+Backend at `api/server.js` handles auth + persistence via `src/services/apiClient.js`:
+
+**Authentication Routes**:
+- `POST /api/auth/github` - Initiate GitHub OAuth
+- `GET /api/auth/callback` - Complete OAuth and set session cookie
+- `POST /api/auth/logout` - Clear session
+- `GET /api/auth/me` - Get current user
+
+**Story Routes**:
+- `POST /api/stories/create` - Create new story
+- `GET /api/stories/mine` - Get user's stories (auth required)
+- `GET /api/stories/explore` - Get public stories
+- `GET /api/stories/by-slug?slug=...` - Get story by slug
+- `POST /api/stories/fork` - Fork public story (requires auth)
+- `PUT /api/stories/:id` - Update story passage
+- `DELETE /api/stories/:id` - Delete story
+
+**Shared Utilities** (`api/_shared/`):
+- `db.js` - MongoDB client with connection pooling
+- `oauth.js` - GitHub OAuth helpers
+- `sessions.js` - JWT session management
+- `validation.js` - Request validation
+- `http.js` - Response helpers
+
+See `specs/001-fullstack-integration/contracts/` for full API contracts.
 
 ---
 
@@ -387,14 +436,58 @@ MVP does not include tests per constitution (no test-first principle), but when 
 
 ---
 
-## Deployment (Future)
+## Deployment
 
-MVP is local development only. Future deployment:
+**Current Status**: Deployed to Vercel with Express.js backend
 
-- **Host**: Vercel (frontend + `/api` serverless)
-- **Build Command**: `npm run build`
-- **Output Directory**: `dist/`
-- **Environment Variables**: `VITE_API_URL` for real backend
+### Vercel Configuration
+
+- **Frontend**: Vite build (`npm run build` → `dist/`)
+- **Backend**: Single Express.js serverless function at `/api/server.js`
+- **Rewrites**: All `/api/*` routes to `server.js`, all other routes to SPA
+- **See**: `vercel.json` for routing configuration
+
+### Environment Variables (Backend)
+
+**Required**:
+- `MONGODB_URI` - MongoDB Atlas connection string
+- `GITHUB_CLIENT_ID` - GitHub OAuth App ID
+- `GITHUB_CLIENT_SECRET` - GitHub OAuth secret
+- `JWT_SECRET` - Session token signing key
+- `BASE_URL` - Deployed app URL (e.g., `https://storyteller.vercel.app`)
+
+**Optional**:
+- `CORS_ALLOWED_ORIGINS` - Comma-separated origins (default: `http://localhost:5173,http://localhost:3000`)
+
+**Frontend** (no env vars required):
+- Ollama URL configurable via UI (OllamaUrlConfig component)
+- Backend API detected automatically (`/api` relative paths)
+
+### Ollama Access from Deployed App
+
+**Option 1: VS Code Dev Tunnels**
+```bash
+# In VS Code, forward port 11434 with public access
+# Copy the tunnel URL (e.g., https://xyz-123.devtunnels.ms)
+```
+
+**Option 2: PowerShell Dev Tunnels**
+```powershell
+devtunnel create --allow-anonymous
+devtunnel port create -p 11434
+devtunnel host
+# Copy the public URL
+```
+
+**Option 3: Hosted VM**
+- Deploy Ollama to cloud VM (Azure, AWS, GCP)
+- Expose port 11434 with reverse proxy (Nginx)
+- Configure SSL/TLS
+- Enter public URL in OllamaUrlConfig
+
+**Option 4: Any Ollama-Compatible API**
+- Enter API endpoint URL in OllamaUrlConfig
+- Must support Ollama API contract (`/api/tags`, `/api/generate`)
 
 ---
 
@@ -412,11 +505,15 @@ MVP is local development only. Future deployment:
 
 ## Key Reference Files
 
-- **Architecture**: `specs/001-frontend-mvp/research.md`
-- **Data Entities**: `specs/001-frontend-mvp/data-model.md`
-- **API Contract**: `specs/001-frontend-mvp/contracts/mockApi.md`
-- **State Machine**: `specs/001-frontend-mvp/contracts/stateMachine.md`
-- **Quick Start**: `specs/001-frontend-mvp/quickstart.md`
+- **Fullstack Spec**: `specs/001-fullstack-integration/spec.md`
+- **Data Model**: `specs/001-fullstack-integration/data-model.md`
+- **Implementation Plan**: `specs/001-fullstack-integration/plan.md`
+- **Tasks**: `specs/001-fullstack-integration/tasks.md`
+- **API Contracts**: `specs/001-fullstack-integration/contracts/`
+  - `auth.md` - GitHub OAuth flow
+  - `ollama.md` - Ollama API integration
+  - `stories.md` - Story persistence endpoints
+- **Quick Start**: `specs/001-fullstack-integration/quickstart.md`
 - **Constitution**: `.specify/memory/constitution.md`
 
 ---
@@ -437,4 +534,10 @@ When assisting with this codebase:
 ---
 
 **Version History**:
-- **1.0.0** (2026-02-28): Initial version with React + Three.js + GSAP + Tailwind stack
+- **2.0.0** (2026-03-06): Fullstack integration complete
+  - Express.js single serverless backend (auth + persistence only)
+  - Direct frontend Ollama connection with custom URL support
+  - GitHub OAuth integration
+  - Story forking, visibility controls, fandom support
+  - MongoDB persistence for users and stories
+- **1.0.0** (2026-02-28): Initial MVP with React + Three.js + GSAP + Tailwind stack

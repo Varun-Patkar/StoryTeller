@@ -2,7 +2,7 @@
 
 **AI-Powered Interactive Story Creation with Cinematic 3D Transitions**
 
-StoryTeller is a web application that combines AI-driven narrative generation with immersive 3D visualizations, creating a unique storytelling experience.
+StoryTeller is a fullstack web application that combines AI-driven narrative generation with immersive 3D visualizations, MongoDB persistence, and optional GitHub authentication.
 
 ---
 
@@ -11,19 +11,40 @@ StoryTeller is a web application that combines AI-driven narrative generation wi
 ### 🎬 Cinematic Experience
 - **3D Earth Visualization**: Deep space camera animations using Three.js
 - **Smooth Transitions**: GSAP-powered camera movements between app phases
-- **Mystical Interface**: Blue/red color scheme with elegant typography
+- **Mystical Interface**: Purple/blue color scheme with elegant typography
+- **Responsive Design**: Works on desktop and tablet
 
-### 🤖 AI Integration
-- **Ollama Model Selection**: Uses llama3.1:8b for AI generation
-- **Frontend LLM Calls**: React frontend talks directly to `http://localhost:11434` (BYOE)
-- **Model Persistence**: Selected model is stored in localStorage and validated on startup
-- **Story Generation**: AI-powered prologue creation based on your character, premise, and goals
-- **Multiple Fandoms**: Create stories in various universes (Douluo Dalu, Naruto, One Piece, etc.)
+### 🤖 AI Integration (BYOE - Bring Your Own Engine)
+- **Direct Ollama Connection**: React frontend connects directly to Ollama API
+- **Flexible Connectivity**:
+  - Default: `http://localhost:11434` for local development
+  - Custom URLs: Support for devtunnels, hosted VMs, or any Ollama-compatible API
+  - CORS Guidance: Automatic detection with fix commands displayed
+- **Model Selection**: Choose any installed Ollama model
+- **Model Persistence**: Selected model stored in localStorage
+- **Streaming Generation**: Real-time AI text generation with streaming UI
+- **Fandom Support**: Create stories in various universes (Douluo Dalu, Naruto, One Piece, etc.)
+- **Context-Aware**: AI uses fandom tone definitions for consistent narrative voice
 
 ### 📚 Story Management
-- **Dashboard**: View and resume existing stories
-- **Story Setup**: Intuitive form with validation and character counters
-- **Reading Interface**: Full-screen immersive reading experience
+- **Story Dashboard**:
+  - **Explore Tab**: Browse all public stories (no login required)
+  - **Your Stories Tab**: View your personal stories (requires GitHub login)
+- **Story Creation**:
+  - Book Name and title customization
+  - Visibility controls (Public/Private)
+  - Character, premise, and goals input
+  - Fandom selection with tone guidance
+  - AI-generated prologue with streaming text
+- **Story Forking**: Respond to public stories to create your own fork
+- **Reading Interface**: Full-screen immersive reading with interactive choices
+- **Smart Slugs**: URL-friendly story slugs for sharing (e.g., `/story/douluo-dalu-awakening`)
+
+### 🔐 Authentication (Optional)
+- **GitHub OAuth**: Sign in with GitHub to access personal features
+- **Session Management**: Secure JWT-based sessions with HTTP-only cookies
+- **Guest Mode**: Explore public stories without signing in
+- **Privacy Controls**: Create private stories visible only to you
 
 ### ⚡ Performance
 - **Lazy Loading**: Code-splitting for optimal bundle size
@@ -34,16 +55,26 @@ StoryTeller is a web application that combines AI-driven narrative generation wi
 
 ## Tech Stack
 
-- **React 18+**: Modern component-based UI
+### Frontend
+- **React 18+**: Modern component-based UI with hooks
 - **Vite**: Lightning-fast build tool and dev server
-- **Three.js**: WebGL 3D graphics
+- **Three.js**: WebGL 3D graphics engine
 - **@react-three/fiber**: React renderer for Three.js
 - **@react-three/drei**: Helper components for Three.js
-- **GSAP**: Professional-grade animations
+- **GSAP**: Professional-grade animation library
 - **Tailwind CSS**: Utility-first styling
-- **Vercel Serverless Functions**: Python `/api` for MongoDB + GitHub OAuth only
-- **MongoDB**: Story persistence
-- **GitHub OAuth**: User authentication
+- **React Router**: Client-side routing with shareable URLs
+
+### Backend
+- **Express.js**: Single serverless function on Vercel
+- **MongoDB Atlas**: Document database for users and stories
+- **GitHub OAuth**: Optional user authentication
+- **JWT**: Session token management
+
+### AI/LLM
+- **Ollama**: Direct API connection from frontend (BYOE)
+- **Flexible Hosting**: localhost, devtunnels, hosted VMs, or Ollama-compatible APIs
+- **Streaming**: Real-time text generation with SSE
 
 ---
 
@@ -51,8 +82,16 @@ StoryTeller is a web application that combines AI-driven narrative generation wi
 
 ### Prerequisites
 
-- Node.js 16+ and npm
-- Ollama installed and running locally (for AI features)
+- **Node.js 18+** and npm
+- **Ollama** installed and running (for AI features)
+  - Download from [ollama.ai](https://ollama.ai)
+  - Pull a model: `ollama pull llama3.1:8b`
+- **MongoDB** (for backend persistence)
+  - Local MongoDB, or
+  - MongoDB Atlas (free tier available)
+- **GitHub OAuth App** (optional, for authentication)
+  - Create at: https://github.com/settings/developers
+  - Set callback URL: `http://localhost:5173/auth/callback`
 
 ### Installation
 
@@ -67,12 +106,40 @@ StoryTeller is a web application that combines AI-driven narrative generation wi
    npm install
    ```
 
-3. **Start development server**
+3. **Configure environment variables**
+   
+   Create `.env` in the project root:
+   ```bash
+   MONGODB_URI=mongodb://localhost:27017/storyteller
+   # Or use MongoDB Atlas:
+   # MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/storyteller
+   
+   GITHUB_CLIENT_ID=your_github_oauth_client_id
+   GITHUB_CLIENT_SECRET=your_github_oauth_secret
+   JWT_SECRET=your_random_secret_key_here
+   BASE_URL=http://localhost:5173
+   ```
+
+4. **Start Ollama with CORS enabled**
+   
+   PowerShell:
+   ```powershell
+   $env:OLLAMA_ORIGINS="http://localhost:5173"; ollama serve
+   ```
+   
+   Unix/Mac:
+   ```bash
+   OLLAMA_ORIGINS="http://localhost:5173" ollama serve
+   ```
+
+5. **Start development servers**
+   
+   Frontend + Backend:
    ```bash
    npm run dev
    ```
 
-4. **Open in browser**
+6. **Open in browser**
    ```
    http://localhost:5173
    ```
@@ -275,19 +342,38 @@ export default function ComponentName({ prop1, prop2 }) {
 
 ---
 
-## Mock API
+## API Architecture
 
-Current implementation uses mocked backend responses (to be replaced by `/api` endpoints):
+### Ollama API (Direct Frontend Connection)
 
-- `checkOllamaConnection()`: Simulates connection check (80% success rate)
-- `getAvailableModels()`: Returns hardcoded model list
-- `getUserStories()`: Returns sample story data with slugs
-- `createStory(setup)`: Generates mock prologue with unique slug
-- `getStoryById(id)`: Returns story details by ID
-- `getStoryBySlug(slug)`: Returns story details by URL slug
-- `getNextPassage(storyId, choiceId)`: Generates next story passage with choices
+The frontend connects directly to Ollama using `src/services/ollamaClient.js`:
 
-All API calls include realistic delays (800-1500ms).
+- `checkOllamaConnection()`: Ping Ollama server and detect CORS issues
+- `getAvailableModels()`: Fetch installed models from `/api/tags`
+- `generatePrologue()`: Stream story prologue from `/api/generate`
+- `generatePassage()`: Stream story continuation with choices
+
+**Custom URL Configuration**:
+- Configure via UI after boot sequence
+- Supports devtunnels, hosted VMs, or any Ollama-compatible API
+- URL persisted in localStorage
+
+### Backend API (Express.js)
+
+The backend at `/api/server.js` provides:
+
+**Authentication**:
+- GitHub OAuth flow
+- Session management with JWT cookies
+- User profile retrieval
+
+**Story Persistence**:
+- Create/update/delete stories
+- Fetch user stories and public stories
+- Story forking for collaborative narratives
+- Slug-based story lookup
+
+See `specs/001-fullstack-integration/contracts/` for detailed API contracts.
 
 ---
 
@@ -301,27 +387,27 @@ All API calls include realistic delays (800-1500ms).
 
 ## Known Limitations
 
-### MVP Scope
-- **No real AI**: Backend integration pending (uses lorem ipsum)
-- **No persistence**: Stories not saved between browser sessions
-- **Limited fandoms**: Predefined list, cannot add custom fandoms
+### Current Scope
+- **BYOE Required**: Users must provide their own Ollama instance
+- **Fandom Definitions**: Predefined list (extensible via `.toon` files)
+- **Single Passage View**: Full passage history viewing not yet implemented
 
 ### Performance
-- **3D model**: ~5MB GLB file (consider optimization)
-- **Initial bundle**: ~200KB gzipped
+- **3D Model**: ~5.5MB GLB file
+- **Initial Bundle**: ~200KB gzipped JS
 
 ---
 
 ## Future Enhancements
 
-- Real Ollama/OpenAI backend integration
-- Story persistence (localStorage or database)
-- Choice-based narrative progression
-- Multiple story passages
-- Export stories to PDF/EPUB
-- Mobile-responsive layout
-- Additional fandom options
-- Character artwork generation
+- **Multi-Model Support**: OpenAI, Anthropic, other providers
+- **Story History View**: Browse all passages in a story
+- **Export**: PDF/EPUB generation
+- **Mobile PWA**: Native app experience
+- **Custom Fandoms**: User-created `.toon` files
+- **Character Art**: AI-generated character portraits
+- **Collaborative Editing**: Real-time co-authoring
+- **Story Analytics**: Word count, reading time, popularity metrics
 
 ---
 
@@ -332,8 +418,22 @@ All API calls include realistic delays (800-1500ms).
 - Verify Earth GLB model is in `public/earth-like/source/`
 
 ### Ollama connection fails
-- Ensure Ollama is running locally
-- Default endpoint: `http://localhost:11434`
+- **Check Ollama is running**: `ollama list` in terminal
+- **Enable CORS**: Run Ollama with `OLLAMA_ORIGINS` env var (see Installation)
+- **Custom URL**: Use OllamaUrlConfig to set devtunnel or VM URL
+- **Network**: Ensure firewall allows port 11434
+
+### "Origin not allowed" error
+- Restart Ollama with CORS origins configured
+- Check that the origin matches your browser URL exactly
+
+### Stories not saving
+- Check MongoDB connection in backend logs
+- Verify `MONGODB_URI` environment variable is set
+
+### GitHub login fails
+- Verify GitHub OAuth app callback URL matches deployment URL
+- Check `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are set
 
 ### Slow performance
 - Clear browser cache
