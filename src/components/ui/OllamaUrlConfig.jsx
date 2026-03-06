@@ -10,6 +10,7 @@
  * @returns {JSX.Element} Dev tunnel configuration UI
  */
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppState } from '@/services/appState.jsx';
 import Button from '@/components/common/Button';
 
@@ -174,6 +175,16 @@ export default function OllamaUrlConfig() {
           >
             Skip for Now
           </Button>
+        </div>
+
+        {/* ABOUT LINK */}
+        <div className="mt-4 text-center">
+          <Link 
+            to="/about" 
+            className="text-sm text-purple-400 hover:text-purple-200 underline transition-colors"
+          >
+            Learn more about StoryTeller
+          </Link>
         </div>
 
         {/* STORED URL INFO */}

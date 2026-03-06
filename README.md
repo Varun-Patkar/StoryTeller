@@ -4,6 +4,44 @@
 
 StoryTeller is a fullstack web application that combines AI-driven narrative generation with immersive 3D visualizations, MongoDB persistence, and optional GitHub authentication.
 
+🚀 **Live Demo**: [https://story-teller-chi.vercel.app/](https://story-teller-chi.vercel.app/)
+
+---
+
+## Screenshots
+
+<div align="center">
+
+### 🌐 Connection Setup
+<img src="images/NotConnected.png" alt="Dev Tunnel Configuration Screen" width="700"/>
+<p><i>Configure Ollama connection with dev tunnels, hosted VMs, or localhost</i></p>
+
+### 🎯 Model Selection
+<img src="images/ChooseModel.png" alt="AI Model Selection Screen" width="700"/>
+<p><i>Choose your AI model from installed Ollama models</i></p>
+
+### 📖 Dashboard - Guest View
+<img src="images/NotSignedIn.png" alt="Dashboard without authentication" width="700"/>
+<p><i>Explore public stories without signing in</i></p>
+
+### 🔐 Dashboard - Signed In
+<img src="images/SignedIn.png" alt="Dashboard with authentication" width="700"/>
+<p><i>Access your personal stories and explore public content</i></p>
+
+### ✍️ Story Creation
+<img src="images/Createnew.png" alt="Story Setup Form" width="700"/>
+<p><i>Create new stories with character, premise, goals, and fandom selection</i></p>
+
+### 📚 Story Reading
+<img src="images/Story.png" alt="Interactive Story Reader" width="700"/>
+<p><i>Immersive reading interface with AI-generated narrative and choices</i></p>
+
+### ℹ️ About Page
+<img src="images/About.png" alt="About StoryTeller" width="700"/>
+<p><i>Learn about the project, technology stack, and developer</i></p>
+
+</div>
+
 ---
 
 ## Features
@@ -134,9 +172,13 @@ StoryTeller is a fullstack web application that combines AI-driven narrative gen
 
 5. **Start development servers**
    
-   Frontend + Backend:
+   Frontend:
    ```bash
    npm run dev
+   ```
+   Backend:
+   ```bash
+   npm run dev:api
    ```
 
 6. **Open in browser**
@@ -448,27 +490,63 @@ See `specs/001-fullstack-integration/contracts/` for detailed API contracts.
 
 ## Contributing
 
-This is an MVP project. Contributions welcome after initial release.
+StoryTeller is now released and open for contributions! 🎉
+
+We welcome contributions of all kinds:
+- 🐛 Bug fixes and issue reports
+- ✨ New features and enhancements
+- 📚 Documentation improvements
+- 🎨 UI/UX enhancements
+- 🌍 New fandom definitions (`.toon` files)
+- 🧪 Tests and quality improvements
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes following the code style guidelines
+4. Commit your changes (`git commit -m 'Add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
+
+Please ensure your code:
+- Follows the modular file structure (max 500 lines per file)
+- Includes JSDoc comments for all functions/components
+- Uses Tailwind CSS only (no inline styles or CSS files)
+- Maintains the mystical theme and user experience
 
 ---
 
 ## License
 
-[Specify license here]
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 ## Credits
 
-- **3D Earth Model**: [Specify source/license]
+- **3D Earth Model**: Custom GLB model
 - **Fonts**: Inter, Segoe UI, Roboto
 - **Icons**: Heroicons (SVG)
+- **AI Engine**: [Ollama](https://ollama.ai)
+- **Deployment**: [Vercel](https://vercel.com)
 
 ---
 
 ## Contact
 
-[Specify contact information]
+### 👨‍💻 Developer: Varun Patkar
+
+Full-Stack Developer & AI Enthusiast passionate about combining immersive 3D experiences with AI to create unique interactive storytelling platforms.
+
+**Connect with me:**
+
+- 🌐 **Portfolio**: [varunpatkar.vercel.app](https://varunpatkar.vercel.app/)
+- 💼 **LinkedIn**: [linkedin.com/in/varun-patkar](https://www.linkedin.com/in/varun-patkar/)
+- 🐙 **GitHub**: [github.com/Varun-Patkar](https://github.com/Varun-Patkar/)
+- 🐦 **X/Twitter**: [@Varun_Patkar](https://x.com/Varun_Patkar)
+
+Feel free to reach out for questions, suggestions, or collaboration opportunities!
 
 ---
 
